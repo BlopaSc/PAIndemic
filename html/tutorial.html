@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<head>
+<meta charset="UTF-8">
+<title>PAIndemic: Humanity's Best, Last and Only Friend</title>
+</head>
+<style>
+body {background-color: powderblue;}
+p {
+	width: 70%;
+}
+ul,ol{
+	text-align: left;
+	width: 70%;
+}
+</style>
+<body>
+<center>
+<h1>How to play</h1>
+<h2>Game rules:</h2>
+<h3>If you already know how to play you can skip to the <a href="#Interface">next section</a> or to the <a href="#Play">start game</a> button.</h3>
+<p>
+If you desire to read the original rule book, it is available <a href="https://images-cdn.zmangames.com/us-east-1/filer_public/25/12/251252dd-1338-4f78-b90d-afe073c72363/zm7101_pandemic_rules.pdf" target="_blank">here</a>.
+</p>
+<h3>Game objectives</h3>
+<p>
+Pandemic is a game in which players must work together to found the cures to 4 diseases that are ravaging the world.<br>
+The four diseases are known by their colors: red, yellow, blue and black and to win the players must find the cures for all of them.<br>
+The game is played on a game board representing a world map with 48 different cities spread throughout the world with different paths connecting them. The cities may get infected by different diseases which are represented by colored cubes in the game board. Players may treat the diseases to remove disease cubes from the cities, or leave them alone, risking the chance of an outbreak happening and the propagation of the disease.<br>
+The players will also have access to players' cards (which are drawn at the end of each turn) that allow them to perform a variety of actions and are a requirement to find the cures for the diseases.<br>
+<br>
+The players lose the games if any of these three events happen:<br>
+<ul>
+<li>The players' cards deck runs out (the players ran out of time) and a player requires to draw a card</li>
+<li>There are more than 24 disease cubes of any color in game (the disease spread too much)</li>
+<li>More than 7 outbreaks occurred during the game (a worldwide panic occurred).</li>
+</ul>
+</p>
+<h3>Players' turns</h3>
+<p>
+The game is divided by turns and each turn consists of different phases:<br>
+First the current turn's player must perform 4 actions (explained in the next subsection), then if the game hasn't finished the player must draw 2 cards from the players' cards deck, if a player were to have more than 7 cards in their hand then cards must be discarded until there are 7 left; finally, cards are drawn from the infection deck and the specified cities are infected with one disease cube of their respective colors.<br>
+The number of cards drawn from the infection deck depend on the current infection rate of the game, which increases after the third and fifth epidemic.<br>
+An epidemic happens when an epidemic card is drawn from the players' cards deck. During an epidemic the bottom card of the infection deck is drawn and the specified city gets 3 infection cubes added, then all the cards in the infection deck discard pile are shuffled and added on top of the infection deck.<br><br>
+If during the infection phase or during an epidemic a city would add cubes resulting in more than 3 cubes of one specific color in the city, then the amount of cubes in the city is capped at 3 for that color but an outbreak will occur.<br>
+During an outbreak all neighboring cities (connected to the outbreaking city) will get one infection cube of the color of the outbreaking city. This can generate an outbreak in those cities, which will create a chain reaction (but cities previously hit by an outbreak chain won't outbreak again).
+</p>
+<h3>Players' actions</h3>
+<p>
+As previously stated, during each of their turns the players must perform 4 actions. This actions may vary from player to player depending on their <b>role</b> (which varies from game to game) and also on their available player cards.<br>
+Each player has the same 8 basic actions:<br>
+<ul>
+<li><b>Drive/ferry to a city:</b> Drives or takes a ferry to a neighboring city connected to the current one.</li>
+<li><b>Direct flight to a city:</b> Flies directly to target city by discarding a player card with its name on it.</li>
+<li><b>Charter flight to any city:</b> Flies directly to any city by discarding a player card with the current city's name on it.</li>
+<li><b>Shuttle flight to a city:</b> Flies directly to a city if both cities have a research station on them.</li>
+<li><b>Build a research station:</b> Build a research station on the current city by discard a player card with its name on it.</li>
+<li><b>Treat disease:</b> Remove 1 disease cube of a specified color from the city you are currently in.</li>
+<li><b>Share knowledge:</b> Give or receive a card with the current city's name on it to/from another player in the current city.</li>
+<li><b>Discover a cure:</b> At a city with a research station, discard 5 cards which share the same color to discover a cure for that colored disease.</li>
+</ul>
+As previously stated, the role of the player may also have an impact on the game and the possible actions that can be performed, in the case of this game this are the possible player roles available and their respective effects:<br>
+<ul>
+<li><b>Medic:</b> Removes all cubes of the same color when treating a disease. If the disease were already cured then he automatically treats the disease when entering the city without consuming an action.</li>
+<li><b>Operations expert:</b> Can build research stations in its current city without discarding any card and once per turn may move from a research station to any city by discarding a city card.</li>
+<li><b>Quarantine specialist:</b> Prevents outbreaks and the placing of cubes in its current city and all cities connected to it, except during setup.</li>
+<li><b>Researcher:</b> May give any city card to other players in the same city.</li>
+<li><b>Scientist:</b> Only requires four player cards of the same color (instead of five) to discover a cure for a disease.</li>
+</ul>
+</p>
+<h2 id="Interface">Game interface:</h2>
+<h3>If you already know the interface you can skip this section and <a href="#Play">start playing</a>.</h3>
+<h3>Starting the game</h3>
+<p>
+When you start playing a new game, the browser should automatically load the WebGL Player but this may take some time depending on your Internet connection (~17 seconds in a 10Mbit/s connection).<br>
+If this does not happen please verify that your browser and the web page have the requirements and permissions needed to run WebGL applications.<br>
+The game should then automatically load, entering directly into your new game. This game is not saved in your computer in any way and if the web page is reloaded then a new game will start.<br>
+Also keep in mind that idle games (>30 minutes since the last action) are removed from server and will not be accessible.<br><br>
+On game start the game should show the world map as seen in the following image:<br><br>
+</p>
+<img src="/images/screenshot1.jpg" width="60%"/><br><br>
+<p>
+If the game layout shows a "Waiting for server" message in red, it probably means the game started on the computer's turn and the turn is being processed; but your turn should start shortly!<br>
+If for some reason the game couldn't contact the server (or if your game stopped existing) the following error message would appear on the game board:<br>
+</p>
+<img src="/images/server_offline.jpg"/><br>
+<h3>Reading the game information</h3>
+<p>
+The game information can be read as follows:<br>
+</p>
+<img src="/images/screenshot2.jpg" width="60%"/><br><br>
+<p>
+<ol>
+<li><b>Remaining cubes:</b> The number of remaining cubes for each of the colors, should the number go lower than zero the game is lost.</li>
+<li><b>Cured disease:</b> Cured diseases are displayed with this symbol on their respective color, if the disease has been eradicated then a cross symbol will be shown.</li>
+<li><b>Active diseases:</b> Active diseases are displayed by a virus-like symbol with their respective color.</li>
+<li><b>Current phase:</b> Specifies the current turn phase: ACTIONS, DISCARD or NEW (NEW only appears while the computer is performing its turn).</li>
+<li><b>Actions remaining:</b> Actions that must be performed before the player's turn ends.</li>
+<li><b>Current turn:</b> Counts all the turns since the game began, including the computers'.</li>
+<li><b>Player's pawn:</b> This is your pawn!</li>
+<li><b>Computer's pawn:</b> The computer's pawn.</li>
+<li><b>Research station on city:</b> Indicates if the city possesses a research station.</li>
+<li><b>Drive/ferry line:</b> Connects cities directly, some of them go from one side of the board to another.</li>
+<li><b>Disease cubes in city:</b> Shows the amount of disease cubes per color in each city.</li>
+<li><b>Quarantine symbol:</b> The cities with this symbol are under quarantine and won't be infected by any disease.</li>
+<li><b>Players' card deck:</b> Shows the number of remaining players' card deck, if you run out of cards the game is lost.</li>
+<li><b>Epidemic counter and infection rate:</b> Number of epidemics since the game began and current infection rate.</li>
+<li><b>Outbreak counter:</b> Number of outbreaks occured since the game began, if 8 or more occur the game is lost.</li>
+<li><b>Player's cards:</b> This row of cards are in your hand!</li>
+<li><b>Computer's cards:</b> This row of cards are in the computer's hand.</li>
+</ol>
+Additional information can be obtained by pressing any of the CONTROL buttons in the keyboard:
+</p>
+<img src="/images/screenshot3.jpg" width="60%"/><br><br>
+<p>
+<ol>
+<li><b>Player's role:</b> This is your role for the game.</li>
+<li><b>Computer's role:</b> This is the computer's role for the game.</li>
+<li><b>Expecting epidemic:</b> Shows if an epidemic is being expected for the current subpile of "epidemic pile left"-cards.</li>
+<li><b>Epidemic pile left:</b> Show the number of cards remaining in this epidemic subpile.</li>
+<li><b>Game log:</b> Shows all the actions taken by all the players during the whole game, including setup.</li>
+<li><b>Infection deck discard pile:</b> Shows the name of the cards currently in the infection deck discard pile.</li>
+<li><b>Players' cards deck discard pile:</b> Shows the names of the players' cards in the discard pile.</li>
+<li><b>Known infection deck piles:</b> From bottom to top, shows the sub-piles currently building the infection deck (which cards may/will appear next).</li>
+</ol>
+</p>
+<h3>Performing an action</h3>
+<p>
+Performing an action is perhaps the most crucial step in controlling the interface: at any given moment you will be either waiting for the server to answer, waiting on the computer's turn or the game client will be expecting you to perform an action.<br>
+There are two main turn phases in which you will be requested to perform an action:<br>
+<ul>
+<li><b>ACTIONS phase:</b> During this phase your possible actions will be signaled by a glowing halo surrounding some of the cities of the map (including your own in some cases) and also by a glowing halo surrounding the computer's pawn (if there is an action that can be performed that includes the other player).</li>
+<li><b>DISCARD phase:</b> During this phase your possible actions will be signaled by a glowing halo surrounding only the player's pawn (YOUR pawn).</li>
+</ul>
+Examples of the glowing halo:
+</p>
+<table><tr>
+<td>City</td><td>Computer's pawn</td><td>Player's pawn</td>
+</tr><tr>
+<td><img src="/images/glow_city.jpg" height="140"/></td>
+<td><img src="/images/glow_computer.jpg" height="140"/></td>
+<td><img src="/images/glow_player.jpg" height="140"/></td>
+</tr></table>
+<p>
+The glowing halo in all of the cases represent that the object is click-able and in doing so a menu will appear that shows all the possible actions:
+</p>
+<img src="/images/screenshot4.jpg" width="60%"/><br><br>
+<img src="/images/screenshot5.jpg" width="60%"/><br>
+<h3>End of game and beyond</h3>
+<p>
+After you have finished the game (shown by a message informing you of your victory or defeat) the whole interface remains the same, allowing you to verify the log and end state of the game.<br>
+<b>TODO: Explain how to questionnaire</b>
+</p>
+<h2><a id="Play" href="/build/index.html">Click here to start a new game!</a></h2>
+</center>
+</body>
+</html>
