@@ -9,12 +9,12 @@ from Players import RandomPlayer
 game_test = Game([RandomPlayer() for i in range(2)])
 
 errors = 0
-for t in range(1000000):
+for t in range(100000):
 	if (t+1)%10000 == 0:
 		print("Game: "+str(t+1))
 	game_test.setup()
 	game_test.game_loop()
-	if game_test.error_ocurred:
+	if game_test.commons['error_flag']:
 		errors += 1
 
 print("Total errors: "+str(errors))

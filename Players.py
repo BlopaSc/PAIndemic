@@ -7,8 +7,8 @@ import random
 from Game import Player
 
 class RandomPlayer(Player):
-	def request_action(self):
-		options = self.available_actions()
+	def request_action(self,game):
+		options = self.available_actions(game)
 		all_options = []
 		for action in options:
 			possible_kwargs = options[action]
@@ -17,5 +17,13 @@ class RandomPlayer(Player):
 		selection = random.choice(all_options)
 		return selection[0],selection[1]
 	
-	def request_discard(self):
+	def request_discard(self,game):
 		return random.choice(self.cards).name
+	
+# TODO: Implement
+def PlanningPlayer(Player):
+	def request_action(self,game):
+		pass
+	
+	def request_discard(self,game):
+		pass

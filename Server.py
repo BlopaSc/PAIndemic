@@ -156,9 +156,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 			games[gid] = game
 			gamelock.release()
 			game.setup()
-			if game.turn_controller.current_player != 0:
+			if game.current_player != 0:
 				game.game_turn()
-			game.turn_controller.start_turn()
+			game.start_turn()
 			game_state = game()
 			game_state.update({"gid": gid, "pid": pid})
 			game_state = json.dumps(game_state,indent="\t").split('\n')	
@@ -197,43 +197,43 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 			# Extracts action and acts accordingly
 			action = get_dictionary['action']
 			del get_dictionary['action']
-			if game.turn_controller.current_player == 0:
+			if game.current_player == 0:
 				# Player must discard
-				if action == 'discard' and game.turn_controller.turn_phase==TurnPhase.DISCARD:
-					game.turn_controller.do_discard(**get_dictionary)
+				if action == 'discard' and game.turn_phase==TurnPhase.DISCARD:
+					game.do_discard(**get_dictionary)
 				# Player must perform action
-				elif game.turn_controller.turn_phase==TurnPhase.ACTIONS:
-					game.turn_controller.do_action(action,get_dictionary)
+				elif game.turn_phase==TurnPhase.ACTIONS:
+					game.do_action(action,get_dictionary)
 					# If the action produces the end of action phase, then do draw step
-					if game.turn_controller.turn_phase==TurnPhase.DRAW:
+					if game.turn_phase==TurnPhase.DRAW:
 						# Might get the turn phase to Discard or Infect
-						game.turn_controller.draw_phase()
+						game.draw_phase()
 				# Be it with the Discard phase or the Action phase, if it ends in Infect phase, perform
-				if game.turn_controller.turn_phase==TurnPhase.INFECT:
+				if game.turn_phase==TurnPhase.INFECT:
 					# After infection, turn phase is new
-					game.turn_controller.end_turn()
+					game.end_turn()
 			# Player receives update up to after infection phase, must request "finish_turn" for AI to execute
-			elif action == 'finish_turn' and game.turn_controller.turn_phase==TurnPhase.NEW:
-				game.turn_controller.start_turn()
-				while game.turn_controller.turn_phase == TurnPhase.ACTIONS:
-					action, kwargs = game.turn_controller.player.request_action()
-					game.turn_controller.do_action(action,kwargs)
-				if game.turn_controller.turn_phase==TurnPhase.DRAW:
-					game.turn_controller.draw_phase()
-				while game.turn_controller.turn_phase==TurnPhase.DISCARD:
-					discard = game.turn_controller.player.request_discard()
-					game.turn_controller.do_discard(discard)
-				if game.turn_controller.turn_phase==TurnPhase.INFECT:
-					game.turn_controller.end_turn()
-				if game.turn_controller.turn_phase==TurnPhase.NEW:
-					game.turn_controller.start_turn()
+			elif action == 'finish_turn' and game.turn_phase==TurnPhase.NEW:
+				game.start_turn()
+				while game.turn_phase == TurnPhase.ACTIONS:
+					action, kwargs = game.players[game.current_player].request_action(game)
+					game.do_action(action,kwargs)
+				if game.turn_phase==TurnPhase.DRAW:
+					game.draw_phase()
+				while game.turn_phase==TurnPhase.DISCARD:
+					discard = game.players[game.current_player].request_discard(game)
+					game.do_discard(discard)
+				if game.turn_phase==TurnPhase.INFECT:
+					game.end_turn()
+				if game.turn_phase==TurnPhase.NEW:
+					game.start_turn()
 			self.ok("text/json")
 			game_state = json.dumps(game(),indent="\t").split('\n')
 			for line in game_state:
 				self.writestring(line)
-			if game.turn_controller.game_state==GameState.LOST or game.turn_controller.game_state==GameState.WON:
+			if game.game_state==GameState.LOST or game.game_state==GameState.WON:
 				# Saves game results to game_results.log
-				gameresults.write(",".join([gid, pid, str(time.time() - game.time_init),*[str(param) for param in participants[pid]],game.turn_controller.game_state.name,str(sum(list(game.cures.values()))),str(sum(list(game.eradicated.values()))),str(len(game.player_deck.deck)),str(game.outbreak_counter),*[str(value) for value in game.remaining_disease_cubes.values()]])+"\n")
+				gameresults.write(",".join([gid, pid, str(time.time() - game.time_init),*[str(param) for param in participants[pid]],game.game_state.name,str(sum(list(game.cures.values()))),str(sum(list(game.eradicated.values()))),str(len(game.player_deck.deck)),str(game.outbreak_counter),*[str(value) for value in game.remaining_disease_cubes.values()]])+"\n")
 				# Results: gid, pid, time_taken, participants info, won/loss, cures_found, eradicated_diseases, pcards_remaining, outbreaks, disease_cubes_remaining x4
 				# TODO: record player answers to survey
 			return
