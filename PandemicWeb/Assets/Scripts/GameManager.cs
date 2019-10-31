@@ -130,7 +130,9 @@ public class GameManager : MonoBehaviour
             computerPlayer.GetComponent<PlayerController>().SetCards(jo["players"]["p1"]["cards"].ToObject <ArrayList>());
             humanPlayer.GetComponent<ClickActions>().ResetActions();
             computerPlayer.GetComponent<ClickActions>().ResetActions();
-            if (jo["turn_phase"].Value<string>().Equals("ACTIONS"))
+            int currentPlayer = jo["current_player"].Value<int>();
+            string turn_phase = jo["turn_phase"].Value<string>();
+            if (turn_phase.Equals("ACTIONS") && currentPlayer==0)
             {
                 // Update turn information
                 GameObject.Find("TextTurn").GetComponent<Text>().text = "Current Turn: " + jo["game_turn"].Value<int>();
@@ -240,7 +242,7 @@ public class GameManager : MonoBehaviour
                     city.GetComponent<ClickActions>().AddAction("Special charter flight to "+ city.GetComponent<CityController>().GetCityName()+" discarding "+NameTransformation(possible["discard"].Value<string>()), "action=special_charter_flight&target="+possible["target"].Value<string>() + "&discard="+possible["discard"].Value<string>());
                 }
             }
-            else if (jo["turn_phase"].Value<string>().Equals("DISCARD"))
+            else if (turn_phase.Equals("DISCARD") && currentPlayer==0)
             {
                 // Update actions remaining
                 GameObject.Find("TextTurnPhase").GetComponent<Text>().text = "Current phase: DISCARD";
@@ -250,13 +252,7 @@ public class GameManager : MonoBehaviour
                     humanPlayer.GetComponent<ClickActions>().AddAction("Discard card "+NameTransformation(possible["discard"].Value<string>()),"action=discard&discard="+ possible["discard"].Value<string>());
                 }
             }
-            else if (jo["turn_phase"].Value<string>().Equals("NEW"))
-            {
-                // Update actions remaining
-                GameObject.Find("TextTurnPhase").GetComponent<Text>().text = "Current phase: WAITING";
-                DoAction("action=finish_turn");
-            }
-            else if (jo["turn_phase"].Value<string>().Equals("INACTIVE"))
+            else if (turn_phase.Equals("INACTIVE"))
             {
                 GameObject.Find("TextTurnPhase").GetComponent<Text>().text = "Current phase: "+ jo["game_state"].Value<string>();
                 waitingText.SetActive(true);
@@ -275,6 +271,12 @@ public class GameManager : MonoBehaviour
                     Debug.Log(jo);
                     Debug.Log("Undocumented game state");
                 }
+            }
+            else if (currentPlayer != 0)
+            {
+                // Update actions remaining
+                GameObject.Find("TextTurnPhase").GetComponent<Text>().text = "Current phase: WAITING";
+                DoAction("action=waiting");
             }
             else
             {

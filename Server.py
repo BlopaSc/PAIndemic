@@ -212,9 +212,10 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 				if game.turn_phase==TurnPhase.INFECT:
 					# After infection, turn phase is new
 					game.end_turn()
-			# Player receives update up to after infection phase, must request "finish_turn" for AI to execute
-			elif action == 'finish_turn' and game.turn_phase==TurnPhase.NEW:
-				game.start_turn()
+			# Player receives update up to after infection phase, must request "waiting" for AI to execute
+			else:
+				if game.turn_phase == TurnPhase.NEW:
+					game.start_turn()
 				while game.turn_phase == TurnPhase.ACTIONS:
 					action, kwargs = game.players[game.current_player].request_action(game)
 					game.do_action(action,kwargs)

@@ -200,13 +200,14 @@ class Game():
 				starting_player = p
 				maximum_population = current_population
 		# Setup player deck
-		subpiles = [[Card(name="Epidemic",cardtype=CardType.EPIDEMIC)] for i in range(self.commons['epidemic_cards'])]
+		subpiles = [[Card(name="Epidemic",cardtype=CardType.EPIDEMIC,color="epidemic")] for i in range(self.commons['epidemic_cards'])]
 		for index,card in enumerate(self.player_deck.deck):
 			subpiles[index%self.commons['epidemic_cards']].append(card)
 		self.player_deck.deck = []
 		for pile in subpiles:
 			random.shuffle(pile)
 			self.player_deck.deck.append(pile)
+		self.player_deck.count_colors()
 		# Reset infection deck
 		single_pile = [card for pile in self.infection_deck.deck for card in pile]
 		single_pile.extend(self.infection_deck.discard)
@@ -224,6 +225,7 @@ class Game():
 		self.commons['error_flag'] = False
 		self.commons['game_log'] = ""
 		self.current_player = starting_player
+		self.real_current_player = None
 		self.current_turn = 1
 		self.turn_phase = TurnPhase.NEW
 		self.game_state = GameState.PLAYING
@@ -283,7 +285,8 @@ class Game():
 				self.players[self.current_player] = copy.copy(self.players[self.current_player])
 				if self.players[self.current_player].perform_action(self,action,kwargs):
 					self.actions -= 1
-					if self.actions == 0:
+					# Check if still in ACTIONS to see if DISCARD interruption occured
+					if self.actions == 0 and self.turn_phase == TurnPhase.ACTIONS:
 						self.turn_phase = TurnPhase.DRAW
 				else:
 					valid = False
@@ -328,7 +331,13 @@ class Game():
 			self.players[self.current_player] = copy.copy(self.players[self.current_player])
 			if self.players[self.current_player].discard(self,discard):
 				if not self.players[self.current_player].must_discard():
-					self.turn_phase = TurnPhase.INFECT
+					if self.real_current_player == None:
+						self.turn_phase = TurnPhase.INFECT
+					else:
+						self.current_player = self.real_current_player
+						self.real_current_player = None
+						if self.actions == 0:
+							self.turn_phase = TurnPhase.DRAW
 			else:
 				print("Invalid card discard")
 		else:
@@ -635,13 +644,17 @@ class Player():
 	# Receiver is pid number, target is string object
 	def give_knowledge(self,game,receiver,target):
 		game.players[receiver  % len(game.players)] = copy.copy(game.players[receiver  % len(game.players)])
-		receiver = game.players[receiver  % len(game.players)]
-		valid = receiver!=self and self.position==receiver.position and target in self.cards and (self.position==target or self.playerrole==PlayerRole.RESEARCHER)
+		receiver_player = game.players[receiver  % len(game.players)]
+		valid = receiver_player!=self and self.position==receiver_player.position and target in self.cards and (self.position==target or self.playerrole==PlayerRole.RESEARCHER)
 		if valid:
-			game.log(self.playerrole.name+" gave "+target+" to: "+receiver.playerrole.name)
-			receiver.cards = copy.copy(receiver.cards)
+			game.log(self.playerrole.name+" gave "+target+" to: "+receiver_player.playerrole.name)
+			receiver_player.cards = copy.copy(receiver_player.cards)
 			self.cards = copy.copy(self.cards)
-			receiver.cards.append(self.cards.pop(self.cards.index(target)))
+			receiver_player.cards.append(self.cards.pop(self.cards.index(target)))
+			if receiver_player.must_discard():
+				game.real_current_player = game.current_player
+				game.current_player = receiver
+				game.turn_phase = TurnPhase.DISCARD
 		return valid
 	
 	# Giver is pid number, target is string object
@@ -654,6 +667,9 @@ class Player():
 			giver.cards = copy.copy(giver.cards)
 			self.cards = copy.copy(self.cards)
 			self.cards.append(giver.cards.pop(giver.cards.index(target)))
+			if self.must_discard():
+				game.real_current_player = game.current_player
+				game.turn_phase = TurnPhase.DISCARD
 		return valid
 	
 	# Color is a string object, chosen_cards is an array containing string objects
@@ -715,6 +731,7 @@ class PlayerDeck():
 		self.deck = [cards.copy()]
 		self.discard = []
 		self.missing = False
+		self.colors = {}
 		
 	def cards_left(self):
 		return sum([len(pile) for pile in self.deck])
@@ -723,7 +740,9 @@ class PlayerDeck():
 		if len(self.deck)>0:
 			self.deck = copy.copy(self.deck)
 			self.deck[-1] = copy.copy(self.deck[-1])
+			self.colors = copy.copy(self.colors)
 			card = self.deck[-1].pop()
+			self.colors[card.color] -= 1
 			if len(self.deck[-1])==0:
 				self.deck.pop()
 		else:
@@ -739,6 +758,14 @@ class PlayerDeck():
 	
 	def out_of_cards(self):
 		return self.missing
+	
+	def count_colors(self):
+		self.colors = {}
+		for pile in self.deck:
+			for card in pile:
+				if card.color not in self.colors.keys():
+					self.colors[card.color] = 0
+				self.colors[card.color] += 1
 	
 class InfectionDeck():
 	def __repr__(self):
