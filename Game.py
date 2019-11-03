@@ -336,8 +336,7 @@ class Game():
 					else:
 						self.current_player = self.real_current_player
 						self.real_current_player = None
-						if self.actions == 0:
-							self.turn_phase = TurnPhase.DRAW
+						self.turn_phase = TurnPhase.ACTIONS if self.actions > 0 else TurnPhase.DRAW
 			else:
 				print("Invalid card discard")
 		else:
@@ -367,9 +366,13 @@ class Game():
 	def game_turn(self):
 		if self.turn_phase == TurnPhase.NEW:
 			self.start_turn()
-		while self.turn_phase == TurnPhase.ACTIONS:
-			action, kwargs = self.players[self.current_player].request_action(self)
-			self.do_action(action,kwargs)
+		while self.turn_phase == TurnPhase.ACTIONS or self.turn_phase == TurnPhase.DISCARD:
+			if self.turn_phase == TurnPhase.ACTIONS:
+				action, kwargs = self.players[self.current_player].request_action(self)
+				self.do_action(action,kwargs)
+			else:
+				discard = self.players[self.current_player].request_discard(self)
+				self.do_discard(discard)
 		if self.turn_phase==TurnPhase.DRAW:
 			self.draw_phase()
 		while self.turn_phase == TurnPhase.DISCARD:
