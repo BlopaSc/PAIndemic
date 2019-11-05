@@ -12,8 +12,6 @@ import traceback
 from enum import IntEnum, auto
 from city_cards import city_cards
 
-debug_console = False
-
 class CardType(IntEnum):
 	MISSING = auto()
 	CITY = auto()
@@ -85,7 +83,7 @@ class Game():
 		self.commons['game_log'] = ""
 		return game
 	
-	def __init__(self,players,epidemic_cards=4,cities=city_cards,starting_city="atlanta",number_cubes=24,log_game=True):
+	def __init__(self,players,epidemic_cards=4,cities=city_cards,starting_city="atlanta",number_cubes=24,log_game=True,debug_console=False):
 		assert(starting_city in cities)
 		# Save game parameters
 		self.commons['epidemic_cards'] = epidemic_cards
@@ -93,7 +91,9 @@ class Game():
 		self.commons['number_cubes'] = number_cubes
 		self.commons['colors'] = []
 		self.commons['logger'] = sys.stdout if debug_console else None
+		self.commons['logger_backup'] = self.commons['logger']
 		self.commons['log_game'] = log_game
+		self.commons['log_game_backup'] = self.commons['log_game']
 		self.commons['game_log'] = ""
 		# Gather city colors and disease cubes
 		for city in city_cards:
@@ -292,7 +292,8 @@ class Game():
 					valid = False
 					print("Invalid move or something")
 					print(self.players[self.current_player])
-					print("Tried to do:",action,kwargs)	
+					print("Tried to do:",action,kwargs)
+					print("In game state:",self)
 			except:
 				print("Error, wrong function or something.")
 				print(action)
@@ -349,6 +350,7 @@ class Game():
 			for i in range(self.infection_rate):
 				self.infection_deck = copy.copy(self.infection_deck)
 				city_name = self.infection_deck.draw().name
+				self.cities = copy.copy(self.cities)
 				self.cities[city_name] = copy.copy(self.cities[city_name])
 				city = self.cities[city_name]
 				city.infect(self,infection=1,color=city.color)
@@ -486,6 +488,7 @@ class Player():
 				game.infection_deck = copy.copy(game.infection_deck)
 				city_name = game.infection_deck.draw_bottom().name
 				game.log(self.playerrole.name+" drew: epidemic\nEpidemic at: "+city_name)
+				game.cities = copy.copy(game.cities)
 				game.cities[city_name] = copy.copy(game.cities[city_name])
 				city = game.cities[city_name]
 				city.infect(game,infection=3,color=city.color)
@@ -622,6 +625,7 @@ class Player():
 		valid = (self.position in self.cards or self.playerrole == PlayerRole.OPERATIONS_EXPERT) and not game.cities[self.position].research_station and (game.research_station_counter<6 or (replace in game.cities.keys() and game.cities[replace].research_station))
 		if valid:
 			game.log(self.playerrole.name+" built research station")
+			game.cities = copy.copy(game.cities)
 			if game.research_station_counter == 6:
 				game.cities[replace] = copy.copy(game.cities[replace])
 				game.cities[replace].research_station = False
@@ -640,6 +644,7 @@ class Player():
 		valid = game.cities[self.position].disease_cubes[color] > 0
 		if valid:
 			game.log(self.playerrole.name+" treated: "+color)
+			game.cities = copy.copy(game.cities)
 			game.cities[self.position] = copy.copy(game.cities[self.position])
 			game.cities[self.position].disinfect(game,game.cities[self.position].disease_cubes[color] if (self.playerrole == PlayerRole.MEDIC or game.cures[color]) else 1 ,color)
 		return valid
