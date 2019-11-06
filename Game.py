@@ -44,7 +44,6 @@ class TurnPhase(IntEnum):
 
 
 class Game():
-	commons = {}
 	
 	def __repr__(self):
 		s = "Turn: "+str(self.current_turn)+", Current player: "+str(self.players[self.current_player].playerrole.name)+", Out.Counter: "+str(self.outbreak_counter)+", Inf.Counter: "+str(self.infection_counter)+", Inf.Rate: "+str(self.infection_rate)+"\n"
@@ -83,17 +82,16 @@ class Game():
 		self.commons['game_log'] = ""
 		return game
 	
-	def __init__(self,players,epidemic_cards=4,cities=city_cards,starting_city="atlanta",number_cubes=24,log_game=True,debug_console=False):
+	def __init__(self,players,epidemic_cards=4,cities=city_cards,starting_city="atlanta",number_cubes=24,log_game=True,external_log=None):
 		assert(starting_city in cities)
 		# Save game parameters
+		self.commons = {}
 		self.commons['epidemic_cards'] = epidemic_cards
 		self.commons['starting_city'] = starting_city
 		self.commons['number_cubes'] = number_cubes
 		self.commons['colors'] = []
-		self.commons['logger'] = sys.stdout if debug_console else None
-		self.commons['logger_backup'] = self.commons['logger']
+		self.commons['logger'] = external_log
 		self.commons['log_game'] = log_game
-		self.commons['log_game_backup'] = self.commons['log_game']
 		self.commons['game_log'] = ""
 		# Gather city colors and disease cubes
 		for city in city_cards:
@@ -254,13 +252,6 @@ class Game():
 						city_distances[key][neighbor] = new_distance
 				unvisited.remove(current_node)
 		self.distances = city_distances
-		
-	def eradication_check(self):
-		for color in self.commons['colors']:
-			if self.cures[color] and not self.eradicated[color] and self.remaining_disease_cubes[color]==self.commons['number_cubes']:
-				self.eradicated = copy.copy(self.eradicated)
-				self.eradicated[color] = True
-				self.log("Eradicated "+color+" disease")
 	
 	def lost(self):
 		return self.player_deck.out_of_cards() or min(self.remaining_disease_cubes.values())<0 or self.outbreak_counter>=8
@@ -294,6 +285,7 @@ class Game():
 					print(self.players[self.current_player])
 					print("Tried to do:",action,kwargs)
 					print("In game state:",self)
+					input("CONTINUE")
 			except:
 				print("Error, wrong function or something.")
 				print(action)
@@ -301,8 +293,6 @@ class Game():
 				traceback.print_exc()
 				self.turn_phase = TurnPhase.INACTIVE
 				self.commons['error_flag'] = True
-			# TODO: Can only check if action == Cure
-			self.eradication_check()
 			if self.won():
 				self.turn_phase = TurnPhase.INACTIVE
 				self.game_state = GameState.WON
@@ -347,10 +337,10 @@ class Game():
 	def end_turn(self):
 		valid = self.turn_phase == TurnPhase.INFECT
 		if valid:
+			self.cities = copy.copy(self.cities)
 			for i in range(self.infection_rate):
 				self.infection_deck = copy.copy(self.infection_deck)
 				city_name = self.infection_deck.draw().name
-				self.cities = copy.copy(self.cities)
 				self.cities[city_name] = copy.copy(self.cities[city_name])
 				city = self.cities[city_name]
 				city.infect(self,infection=1,color=city.color)
@@ -452,7 +442,10 @@ class City():
 		self.disease_cubes[color] -= disinfection
 		game.remaining_disease_cubes = copy.copy(game.remaining_disease_cubes)
 		game.remaining_disease_cubes[color] += disinfection
-		
+		if game.cures[color] and game.remaining_disease_cubes[color]==game.commons['number_cubes']:
+			game.eradicated = copy.copy(game.eradicated)
+			game.eradicated[color] = True
+			game.log("Eradicated "+color+" disease")
 	
 class Player():
 	def __repr__(self):
@@ -507,6 +500,7 @@ class Player():
 			game.medic_position = self.position
 			for color in game.cures:
 				if game.cures[color] and game.cities[self.position].disease_cubes[color]>0:
+					game.cities = copy.copy(game.cities)
 					game.cities[self.position] = copy.copy(game.cities[self.position])
 					game.cities[self.position].disinfect(game,game.cities[self.position].disease_cubes[color],color)
 					game.log("MEDIC healed "+str(color)+" at "+str(self.position))
@@ -689,6 +683,10 @@ class Player():
 				self.discard(game,card)
 			game.cures = copy.copy(game.cures)
 			game.cures[color] = True
+			if game.remaining_disease_cubes[color]==game.commons['number_cubes']:
+				game.eradicated = copy.copy(game.eradicated)
+				game.eradicated[color] = True
+				game.log("Eradicated "+color+" disease")
 			for player in game.players:
 				if player.playerrole == PlayerRole.MEDIC:
 					player.move_triggers(game)
@@ -824,7 +822,6 @@ class InfectionDeck():
 
 if __name__ == '__main__':
 	from Players import RandomPlayer
-	debug_console = True
-	game = Game([RandomPlayer(),RandomPlayer()])
+	game = Game([RandomPlayer(),RandomPlayer()],external_log=sys.stdout)
 	game.setup()
 	game.game_loop()

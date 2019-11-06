@@ -20,10 +20,3 @@ class RandomPlayer(Player):
 	def request_discard(self,game):
 		return random.choice(self.cards).name
 	
-# TODO: Implement
-def PlanningPlayer(Player):
-	def request_action(self,game):
-		pass
-	
-	def request_discard(self,game):
-		pass

@@ -76,9 +76,7 @@ class ServerGame(Game):
 		self.time_init = time.time()
 		self.ping = self.time_init
 		self.gid = gid
-		super().__init__(players,epidemic_cards,cities,starting_city,number_cubes)
-		if log_games:
-			self.logger = open("logs/game"+gid+".log","w")
+		super().__init__(players,epidemic_cards,cities,starting_city,number_cubes,external_log=open("logs/game"+gid+".log","w") if log_games else None)
 	
 	def close_game(self):
 		print(time.asctime() + " Closing game: "+self.gid)
