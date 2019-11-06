@@ -172,6 +172,10 @@ The variables will be explained as follows:
 
 You may edit any other configurations at will, I know this server may have HUGE security concerns, so please let me know if you come up with any improvements.
 
+## Readable information from the game logic
+
+__TODO__
+
 ## Authors
 
 * Pablo Sauma-Chacón, a.k.a Blopa
@@ -184,6 +188,6 @@ Still need to think about this
 
 ## Acknowledgments
 
-* Special thanks to Markus for his counseling and for allowing me to rip off 90% of his A-star implementation
+* Special thanks to Markus for his guidance and for allowing me to rip off 90% of his A-star implementation
 * Thanks to thomaskeefe for his implementation of Pydemic which gave me inspiration for this project
 
