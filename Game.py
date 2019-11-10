@@ -157,6 +157,8 @@ class Game():
 				player.special_move = False
 			self.player_deck.discard.extend(player.cards)
 			player.cards = []
+			player.colors = {color:0 for color in self.commons['colors']}
+			player.colors[None] = 0
 		# City setup
 		for c in self.cities:
 			city = self.cities[c]
@@ -188,6 +190,7 @@ class Game():
 				card = self.player_deck.deck.pop()
 				self.log(player.playerrole.name+" drew: "+card.name)
 				player.cards.append(card)
+				player.colors[card.color]+=1
 		self.player_deck.missing = False
 		# Define starting player
 		maximum_population = 0
@@ -205,8 +208,16 @@ class Game():
 		for pile in subpiles:
 			random.shuffle(pile)
 			self.player_deck.deck.append(pile)
-		self.player_deck.count_colors()
-		# Reset infection deck
+		self.player_deck.remaining = sum(len(p) for p in self.player_deck.deck)
+		self.player_deck.expecting_epidemic = True
+		self.player_deck.epidemic_countdown = len(self.player_deck.deck[-1])
+		self.player_deck.colors = {}
+		for pile in self.player_deck.deck:
+			for card in pile:
+				if card.color not in self.player_deck.colors.keys():
+					self.player_deck.colors[card.color] = 0
+				self.player_deck.colors[card.color] += 1
+		# Prepare infection deck
 		single_pile = [card for pile in self.infection_deck.deck for card in pile]
 		single_pile.extend(self.infection_deck.discard)
 		random.shuffle(single_pile)
@@ -254,7 +265,7 @@ class Game():
 		self.distances = city_distances
 	
 	def lost(self):
-		return self.player_deck.out_of_cards() or min(self.remaining_disease_cubes.values())<0 or self.outbreak_counter>=8
+		return self.player_deck.remaining<0 or min(self.remaining_disease_cubes.values())<0 or self.outbreak_counter>=8
 	
 	def won(self):
 		return all(self.cures.values())
@@ -262,6 +273,7 @@ class Game():
 	def start_turn(self):
 		valid = self.turn_phase == TurnPhase.NEW
 		if valid:
+			self.log("Turn begin: "+self.players[self.current_player].playerrole.name)
 			self.actions = 4
 			self.turn_phase = TurnPhase.ACTIONS
 		else:
@@ -298,6 +310,7 @@ class Game():
 				self.game_state = GameState.WON
 		else:
 			print("Invalid do action, current turn phase: "+self.turn_phase.name)
+			input("CONTINUE")
 		return valid
 	
 	def draw_phase(self):
@@ -381,6 +394,8 @@ class Game():
 			self.log("Players won the game")
 		elif self.game_state == GameState.LOST:
 			self.log("Players lost the game")
+		else:
+			self.log("This should not happen")
 	
 class Card(object):
 	def __repr__(self):
@@ -463,6 +478,7 @@ class Player():
 		self.cards = []
 		self.position = None
 		self.playerrole = PlayerRole.NULL
+		self.colors = {}
 		
 	def get_id(self):
 		return (self.position,tuple(c.name for c in self.cards))
@@ -489,6 +505,8 @@ class Player():
 				game.infection_deck.intensify()
 			elif card.cardtype != CardType.MISSING:
 				game.log(self.playerrole.name+" drew: "+card.name)
+				self.colors = copy.copy(self.colors)
+				self.colors[card.color]+=1
 				# Normal card
 				self.cards.append(card)
 		# Draws at end of turn, so resets Operations Expert special ability
@@ -570,8 +588,11 @@ class Player():
 			game.log(self.playerrole.name+" discarded: "+card)
 			self.cards = copy.copy(self.cards)
 			game.player_deck = copy.copy(game.player_deck)
+			card = self.cards.pop(self.cards.index(card))
+			self.colors = copy.copy(self.colors)
+			self.colors[card.color]-=1
 			game.player_deck.discard = copy.copy(game.player_deck.discard)
-			game.player_deck.discard.append(self.cards.pop(self.cards.index(card)))
+			game.player_deck.discard.append(card)
 		return valid
 	
 	# Target is string object to new position
@@ -654,6 +675,7 @@ class Player():
 			self.cards = copy.copy(self.cards)
 			receiver_player.cards.append(self.cards.pop(self.cards.index(target)))
 			if receiver_player.must_discard():
+				game.log(receiver_player.playerrole.name + " must discard")
 				game.real_current_player = game.current_player
 				game.current_player = receiver
 				game.turn_phase = TurnPhase.DISCARD
@@ -670,6 +692,7 @@ class Player():
 			self.cards = copy.copy(self.cards)
 			self.cards.append(giver.cards.pop(giver.cards.index(target)))
 			if self.must_discard():
+				game.log(self.playerrole.name + " must discard")
 				game.real_current_player = game.current_player
 				game.turn_phase = TurnPhase.DISCARD
 		return valid
@@ -720,27 +743,26 @@ class Player():
 	
 class PlayerDeck():
 	def __repr__(self):
-		return "Expecting epidemic: "+str(1 if self.expecting_epidemic() else 0)+", Next epidemic in: "+str(self.epidemic_countdown())+", Remaining cards: "+str(self.cards_left())
+		return "Expecting epidemic: "+str(1 if self.expecting_epidemic else 0)+", Next epidemic in: "+str(self.epidemic_countdown)+", Remaining cards: "+str(self.remaining)
 	
 	def __call__(self):
 		remaining_cards = [card.name for pile in self.deck for card in pile]
 		remaining_cards.sort()
 		return {
-			'cards_left': self.cards_left(),
+			'cards_left': self.remaining,
 			'deck': remaining_cards,
 			'discard': [card.name for card in self.discard],
-			'epidemic_countdown': self.epidemic_countdown(),
-			'epidemic_expectation': self.expecting_epidemic()
+			'epidemic_countdown': self.epidemic_countdown,
+			'epidemic_expectation': self.expecting_epidemic
 		}
 	
 	def __init__(self,cards):
 		self.deck = [cards.copy()]
 		self.discard = []
-		self.missing = False
+		self.remaining = 0
+		self.expecting_epidemic = False
+		self.epidemic_countdown = 0
 		self.colors = {}
-		
-	def cards_left(self):
-		return sum([len(pile) for pile in self.deck])
 		
 	def draw(self):
 		if len(self.deck)>0:
@@ -749,43 +771,39 @@ class PlayerDeck():
 			self.colors = copy.copy(self.colors)
 			card = self.deck[-1].pop()
 			self.colors[card.color] -= 1
+			self.remaining -= 1
+			self.epidemic_countdown -= 1
+			self.expecting_epidemic = self.expecting_epidemic and card.cardtype!=CardType.EPIDEMIC
 			if len(self.deck[-1])==0:
 				self.deck.pop()
+				self.expecting_epidemic = True
+				self.epidemic_countdown = len(self.deck[-1]) if len(self.deck)>0 else 0
 		else:
+			self.remaining -= 1
 			card = Card(name="",cardtype=CardType.MISSING)
-			self.missing = True
 		return card
 	
-	def expecting_epidemic(self):
-		return any([card.cardtype==CardType.EPIDEMIC for card in self.deck[-1]]) if len(self.deck)>1 else False
-	
-	def epidemic_countdown(self):
-		return len(self.deck[-1]) if len(self.deck)>1 else 0
-	
-	def out_of_cards(self):
-		return self.missing
-	
-	def count_colors(self):
-		self.colors = {}
-		for pile in self.deck:
-			for card in pile:
-				if card.color not in self.colors.keys():
-					self.colors[card.color] = 0
-				self.colors[card.color] += 1
+	@property
+	def possible_deck(self):
+		pile_info = [[len(pile),any([card.cardtype==CardType.EPIDEMIC for card in pile])] for pile in self.deck]		
+		cards = [card for pile in self.deck for card in pile if card.cardtype != CardType.EPIDEMIC]
+		deck = []
+		random.shuffle(cards)
+		for p in pile_info:
+			pile = [Card(name="Epidemic",cardtype=CardType.EPIDEMIC,color="epidemic")] if p[1] else []
+			for c in range(len(pile),p[0]):
+				pile.append(cards.pop())
+			random.shuffle(pile)
+			deck.append(pile)
+		return deck
 	
 class InfectionDeck():
 	def __repr__(self):
-		known_cards = [[card.name for card in pile] for pile in self.deck]
-		for pile in known_cards:
-			pile.sort()
-		return "Possible next cards: "+str(known_cards)
+		return "Possible next cards: "+str(self.known_cards)
 	
 	def __call__(self):
-		known_cards = [[card.name for card in pile] for pile in self.deck]
-		for pile in known_cards:
-			pile.sort()
 		return {
-			'known_piles': known_cards,
+			'known_piles': self.known_cards,
 			'discard': [card.name for card in self.discard]
 		}
 	
@@ -819,9 +837,26 @@ class InfectionDeck():
 		random.shuffle(self.discard)
 		self.deck.append(self.discard)
 		self.discard = []
+		
+	@property
+	def known_cards(self):
+		known_cards = [[card.name for card in pile] for pile in self.deck]
+		for pile in known_cards:
+			pile.sort()
+		return known_cards
+		
+	@property
+	def possible_deck(self):
+		deck = []
+		for pile in self.deck:
+			new_pile = copy.copy(pile)
+			random.shuffle(new_pile)
+			deck.append(new_pile)
+		return deck
 
 if __name__ == '__main__':
 	from Players import RandomPlayer
 	game = Game([RandomPlayer(),RandomPlayer()],external_log=sys.stdout)
 	game.setup()
+	print(game)
 	game.game_loop()

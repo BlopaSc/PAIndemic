@@ -8,6 +8,8 @@ To get started you might require the following software and tools:
 * Unity: The web client is built using Unity, all the files and resources needed are found within the "PandemicWeb" subfolder.
 * Python 3: The server and game logic are implemented using Python 3 and its standard libraries (mostly).
 
+Also, the reading of the rulebook and/or playing the game is highly encouraged, the rulebook is accessible here: [Pandemic-rulebook](https://images-cdn.zmangames.com/us-east-1/filer_public/25/12/251252dd-1338-4f78-b90d-afe073c72363/zm7101_pandemic_rules.pdf)
+
 ### Prerequisites
 
 Most of the system is built using standard libraries but just in case here is a complete list of libraries used:
@@ -172,9 +174,51 @@ The variables will be explained as follows:
 
 You may edit any other configurations at will, I know this server may have HUGE security concerns, so please let me know if you come up with any improvements.
 
-## Readable information from the game logic
+## Observable space
 
-__TODO__
+The system provides a wide variety of game state information through the current structure, each of the different variables will be explained here:
+
+* __Game information__: This attributes can be accesed through the object game
+    * __game_turn__: Current turn number, starts at 1
+    * __game_state__: Current game state, a value of the GameState enum: NOT_PLAYING, PLAYING, WON and LOST
+    * __turn_phase__: Current turn phase, a value of the TurnPhase enum: INACTIVE, NEW, ACTIONS, DRAW, DISCARD and INFECT 
+    * __current_player__: Number of the current player, a value from 0 to number of players - 1
+    * __actions__: Number of remaining actions in the current turn, a value from 0 to 4
+    * __infection_rate__: Number of infections applied at the end of each turn, starts at 2
+    * __infection_counter__: Number of infections that have occured since the beginning of the game
+    * __outbreak_counter__: Number of outbreaks that have occured since the beginning of the game
+    * __cures__: Dictionary that tracks which cures have been found: cures["color"] = True/False
+    * __eradicated__: Dictionary that tracks which diseases have been eradicated: eradicated["color"] = True/False
+    * __remaining_disease_cubes__: Dictionary that tracks how many remaining cubes there are of each color: remaining_disease_cubes["color"] = int
+	* __distances__: __TODO__
+* __Card object information__: Card objects are used in the players' hands and in the player deck, their information is stored in the following attributes:
+    * __name__: String with the name of the card
+    * __cardtype__: A value of the CardType enum: MISSING, CITY, EVENT and PANDEMIC (EVENT is currently not in use and MISSING is used only when the deck runs out of cards and the players lose the game)
+    * __color__: String with the color of the card, if the card is colorless then that value is None
+* __Player information__: This attributes can be accessed through the object game.players[player_number]
+    * __location__: String with the name of the current city
+    * __role__: Player's role, a value of the PlayerRole enum, currently restricted to: SCIENTIST, RESEARCHER, MEDIC and QUARANTINE_SPECIALIST
+    * __cards__: Array of Card objects in the player's hand
+    * __colors__: Dictionary that tracks the number of cards with each color in the player's hand
+* __City information__: This attributes can be accessed through the object game.cities["city_name"]
+    * __name__: String with the name of the city
+    * __color__: String with the color of the city
+    * __neighbors__: Array of strings with the names of neighboring cities
+    * __disease_cubes__: Dictionary that tracks the number of disease cubes present of each color: disease_cubes["color"] = int
+    * __research_station__: Boolean value representing the presence or absence of a research station in the city
+* __Player deck information__: This attributes can be accessed through the object game.player_deck
+    * __deck__: The current player deck, __this attribute should not be read by any agent__
+    * __discard__: Array of cards in the discard pile of the player deck
+    * __remaining__: Number of cards still remaining in the deck
+    * __epidemic_countdown__: Cards remaining in this set of player cards due to the smoothed randomness of epidemics
+    * __expecting_epidemic__: Boolean showing whether this set's epidemic is yet to happen
+    * __colors__: Dictionary containing the number of remaining cards by color (including "epidemic" and None): colors["color"] = int
+    * __possible_deck__: Property which returns a randomized and valid version of the current player deck
+* __Infection deck information__: This attributes can be accessed through the object game.infection_deck
+    * __deck__: The current infection deck, __this attribute should not be read by any agent__
+    * __discard__: Array of cards in the discard pile of the infection deck
+    * __known_cards__: Array of arrays, each representing a different set of known cards (result of the epidemic's reshuffling)
+    * __possible_deck__: Property which returns a randomized and valid version of the current infection deck
 
 ## Authors
 
@@ -188,6 +232,6 @@ Still need to think about this
 
 ## Acknowledgments
 
-* Special thanks to Markus for his guidance and for allowing me to rip off 90% of his A-star implementation
+* Special thanks to Markus for his counseling and for allowing me to rip off 90% of his A-star implementation
 * Thanks to thomaskeefe for his implementation of Pydemic which gave me inspiration for this project
 
