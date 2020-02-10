@@ -44,7 +44,8 @@ public class CityController : MonoBehaviour
     void Update()
     {
         // Updates city name position
-        this.myCityName.transform.position = Camera.main.WorldToScreenPoint(this.transform.position)+textOffset;
+        Vector3 position = Camera.main.WorldToScreenPoint(this.transform.position);
+        this.myCityName.transform.position = new Vector3(position.x+textOffset.x,position.y+textOffset.y,0f);
     }
 
     public string GetCityName()

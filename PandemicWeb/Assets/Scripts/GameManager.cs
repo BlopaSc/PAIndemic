@@ -8,7 +8,10 @@ public class GameManager : MonoBehaviour
 
     public static readonly string[] colors = { "yellow", "red", "blue", "black" };
 
-    public const string SERVER = "http://127.0.0.1:31337/";
+    // For the local distribution
+    // public const string SERVER = "http://127.0.0.1:31337/";
+    // For the cloud distribution
+    public const string SERVER = "http://35.239.38.12:80/";
 #pragma warning disable CS0618 // Type or member is obsolete
     public WWW www=null;
 #pragma warning restore CS0618 // Type or member is obsolete
@@ -44,7 +47,17 @@ public class GameManager : MonoBehaviour
 
     public static string NameTransformation(string text)
     {
-        return text.ToUpper()[0] + text.Substring(1).Replace("_", " ");
+        text = text.Replace('_', ' ');
+        string up = text.ToUpper();
+        string down = text.ToLower();
+        string result = "";
+        bool uppercase = true;
+        for(int i=0;i<text.Length;i++)
+        {
+            result += uppercase ? up[i] : down[i];
+            uppercase = text[i] == ' ';
+        }
+        return result;
     }
 
     IEnumerator Request(string url)
@@ -58,8 +71,13 @@ public class GameManager : MonoBehaviour
             yield return www;
             if (www.text.Length == 0)
             {
+                if (url.StartsWith("http://"))
+                {
+                    url = url.Substring(7);
+                }
+                url = url.Substring(0, url.IndexOf('/'));
                 waitingText.SetActive(true);
-                waitingText.GetComponent<Text>().text = "Unable to contact server\nTry again later";
+                waitingText.GetComponent<Text>().text = "Unable to contact server\n"+url;
                 yield break;
             }
             waitingText.SetActive(false);
@@ -85,31 +103,38 @@ public class GameManager : MonoBehaviour
             // Updates information regarding player deck, infection deck and player roles
             GameObject.Find("TextPlayerDeck").GetComponent<Text>().text = "Remain: " + jo["player_deck"]["cards_left"].Value<int>();
             ArrayList discarded = jo["infection_deck"]["discard"].ToObject<ArrayList>();
-            GameObject.Find("InfectionDeckDiscard").GetComponent<Text>().text = "Discard:\n\n";
+            GameObject.Find("InfectionDeckDiscard").GetComponent<Text>().text = "Discard:\n\n<b>";
             foreach (string discard in discarded)
             {
-                GameObject.Find("InfectionDeckDiscard").GetComponent<Text>().text += GameManager.NameTransformation(discard)+", ";
+                GameObject.Find("InfectionDeckDiscard").GetComponent<Text>().text += GameManager.ColoredName(discard)+", ";
             }
+            GameObject.Find("InfectionDeckDiscard").GetComponent<Text>().text += "</b>";
             discarded = jo["player_deck"]["discard"].ToObject<ArrayList>();
-            GameObject.Find("PlayerDeckDiscard").GetComponent<Text>().text = "Discard:\n\n";
+            GameObject.Find("PlayerDeckDiscard").GetComponent<Text>().text = "Discard:\n\n<b>";
             foreach(string discard in discarded)
             {
-                GameObject.Find("PlayerDeckDiscard").GetComponent<Text>().text += GameManager.NameTransformation(discard) + ", ";
+                GameObject.Find("PlayerDeckDiscard").GetComponent<Text>().text += GameManager.ColoredName(discard) + ", ";
             }
-            GameObject.Find("TextTurnInformation").GetComponent<Text>().text = "Player role:\n" + jo["players"]["p0"]["role"].Value<string>().Replace("_"," ") + "\n\nComputer role:\n" + jo["players"]["p1"]["role"].Value<string>().Replace("_", " ") + "\n\n";
-            GameObject.Find("TextTurnInformation").GetComponent<Text>().text += "Expecting epidemic:\n"+jo["player_deck"]["epidemic_expectation"].Value<bool>()+"\n\nEpidemic pile left:\n"+ jo["player_deck"]["epidemic_countdown"].Value<int>();
+            GameObject.Find("PlayerDeckDiscard").GetComponent<Text>().text += "</b>";
+            // GameObject.Find("TextTurnInformation").GetComponent<Text>().text = "Player role:\n" + jo["players"]["p0"]["role"].Value<string>().Replace("_"," ") + "\n\n\n\nComputer role:\n" + jo["players"]["p1"]["role"].Value<string>().Replace("_", " ") + "\n\n";
+            // GameObject.Find("TextTurnInformation").GetComponent<Text>().text += "Expecting epidemic:\n"+jo["player_deck"]["epidemic_expectation"].Value<bool>()+"\n\nEpidemic pile left:\n"+ jo["player_deck"]["epidemic_countdown"].Value<int>();
+            GameObject.Find("TextPlayerInformation").GetComponent<Text>().text = "Player role:\n" + jo["players"]["p0"]["role"].Value<string>().Replace("_", " ");
+            GameObject.Find("TextComputerInformation").GetComponent<Text>().text = "Computer role:\n" + jo["players"]["p1"]["role"].Value<string>().Replace("_", " ");
             ArrayList piles = jo["infection_deck"]["known_piles"].ToObject<ArrayList>();
-            GameObject.Find("InfectionDeckPiles").GetComponent<Text>().text = "Known infection deck piles:\n\n> Bottom first:\n\n";
+            GameObject.Find("InfectionDeckPiles").GetComponent<Text>().text = "Known infection deck piles:\n\n> Bottom first:\n\n<b>";
             foreach (var pile in piles)
             {
                 foreach (string cityname in (JArray)(pile))
                 {
-                    GameObject.Find("InfectionDeckPiles").GetComponent<Text>().text += GameManager.NameTransformation(cityname) + ", " ;
+                    GameObject.Find("InfectionDeckPiles").GetComponent<Text>().text += GameManager.ColoredName(cityname) + ", ";
                 }
                 GameObject.Find("InfectionDeckPiles").GetComponent<Text>().text += "\n\n";
             }
-            // Update game log
-            gameLogText.GetComponent<GameLogController>().AddLog(jo["game_log"].Value<string>());
+            GameObject.Find("InfectionDeckPiles").GetComponent<Text>().text += "</b>";
+            // Update game log and show messages
+            string log = jo["game_log"].Value<string>();
+            gameLogText.GetComponent<GameLogController>().AddLog(log);
+            MessageManager.AddMessages(log.Split('\n'));
             // Updates city information
             GameObject city;
             ArrayList quarantine = jo["quarantine_cities"].ToObject<ArrayList>();
@@ -128,7 +153,9 @@ public class GameManager : MonoBehaviour
             computerPlayer.GetComponent<PlayerController>().SetLocation(jo["players"]["p1"]["location"].Value<string>());
             humanPlayer.GetComponent<PlayerController>().SetCards(jo["players"]["p0"]["cards"].ToObject<ArrayList>());
             computerPlayer.GetComponent<PlayerController>().SetCards(jo["players"]["p1"]["cards"].ToObject <ArrayList>());
-            humanPlayer.GetComponent<ClickActions>().ResetActions();
+            // Not needed anymore since moved discarding actions to the cards
+            // humanPlayer.GetComponent<ClickActions>().ResetActions();
+            humanPlayer.GetComponent<PlayerController>().ResetCards();
             computerPlayer.GetComponent<ClickActions>().ResetActions();
             int currentPlayer = jo["current_player"].Value<int>();
             string turn_phase = jo["turn_phase"].Value<string>();
@@ -143,7 +170,7 @@ public class GameManager : MonoBehaviour
                 foreach (JObject possible in jo["actions"]["drive_ferry"].ToObject<ArrayList>())
                 {
                     city = GameObject.Find(possible["target"].Value<string>());
-                    city.GetComponent<ClickActions>().AddAction("Drive ferry to " + city.GetComponent<CityController>().GetCityName(), "action=drive_ferry&target=" + possible["target"].Value<string>());
+                    city.GetComponent<ClickActions>().AddAction("Drive or ferry to " + city.GetComponent<CityController>().GetCityName(), "action=drive_ferry&target=" + possible["target"].Value<string>());
                 }
                 // Direct flight actions
                 foreach (JObject possible in jo["actions"]["direct_flight"].ToObject<ArrayList>())
@@ -194,12 +221,14 @@ public class GameManager : MonoBehaviour
                 {
                     city.GetComponent<ClickActions>().AddAction("Treat " + possible["color"].Value<string>() + " disease", "action=treat_disease&color=" + possible["color"].Value<string>());
                 }
-                // Find cure
+                // Discover cure
                 foreach (JObject possible in jo["actions"]["discover_cure"].ToObject<ArrayList>())
                 {
                     string cities = "", citiesURL = "";
                     bool first = true;
-                    foreach (string cityname in possible["chosen_cards"].ToObject<ArrayList>())
+                    ArrayList cure_cards = possible["chosen_cards"].ToObject<ArrayList>();
+                    cure_cards.Sort();
+                    foreach (string cityname in cure_cards)
                     {
                         if (first)
                         {
@@ -247,9 +276,12 @@ public class GameManager : MonoBehaviour
                 // Update actions remaining
                 GameObject.Find("TextTurnPhase").GetComponent<Text>().text = "Current phase: DISCARD";
                 GameObject.Find("TextActionsRemaining").GetComponent<Text>().text = "Actions remaining: " + jo["remaining_actions"].Value<int>();
+                GameObject card;
                 foreach(JObject possible in jo["actions"]["discard"].ToObject<ArrayList>())
                 {
-                    humanPlayer.GetComponent<ClickActions>().AddAction("Discard card "+NameTransformation(possible["discard"].Value<string>()),"action=discard&discard="+ possible["discard"].Value<string>());
+                    // humanPlayer.GetComponent<ClickActions>().AddAction("Discard card "+NameTransformation(possible["discard"].Value<string>()),"action=discard&discard="+ possible["discard"].Value<string>());
+                    card = GameObject.Find("Card_" + possible["discard"].Value<string>());
+                    card.GetComponent<ClickActions>().AddAction("Discard card " + NameTransformation(possible["discard"].Value<string>()), "action=discard&discard=" + possible["discard"].Value<string>());
                 }
             }
             else if (turn_phase.Equals("INACTIVE"))
@@ -293,6 +325,11 @@ public class GameManager : MonoBehaviour
 
     public static void Focus(GameObject newFocus, ArrayList actions, ArrayList actionsURLs)
     {
+        if (GameObject.Find("ToggleSkipAction").GetComponent<Toggle>().isOn && actionsURLs.Count == 1)
+        {
+            GameObject.Find("GameManager").GetComponent<GameManager>().DoAction((string)(actionsURLs[0]));
+            return;
+        }
         if (optionsMenu != null)
         {
             optionsMenu.SetActive(true);
@@ -307,6 +344,7 @@ public class GameManager : MonoBehaviour
                 GameObject newButton = GameObject.Instantiate(Resources.Load<GameObject>("ActionButton"));
                 newButton.SetActive(true);
                 newButton.transform.SetParent(menuContent.transform);
+                newButton.GetComponent<RectTransform>().localScale = new Vector3(1.0f, 1.0f,1.0f);
                 newButton.GetComponent<ButtonController>().SetText((string)(actions[i]),(string)(actionsURLs[i]));
             }
         }
@@ -329,6 +367,31 @@ public class GameManager : MonoBehaviour
             optionsMenu.SetActive(false);
         }
         focused = false;
+    }
+
+    private static string ColoredName(string cityname)
+    {
+        string colorname = GameObject.Find(cityname).GetComponent<SpriteRenderer>().sprite.name.Substring(4).ToLower();
+        string color = "#";
+        switch (colorname)
+        {
+            case "black":
+                color += "666666";
+                break;
+            case "blue":
+                color += "2A7FFF";
+                break;
+            case "red":
+                color += "FF2A2A";
+                break;
+            case "yellow":
+                color += "FFCC00";
+                break;
+            default:
+                color += "";
+                break;
+        }
+        return "<color=" + color + ">" + GameManager.NameTransformation(cityname) + "</color>";
     }
 
 }

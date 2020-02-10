@@ -46,19 +46,19 @@ public class CameraController : MonoBehaviour
         bool moveRight = (transform.position.x + xMax) < sizeX;
         bool moveDown = (transform.position.y + sizeY) > yMax;
         bool moveUp = (transform.position.y + yMax) < sizeY;
-        if ((Input.GetKey(KeyCode.W) || moveUp) && !moveDown)
+        if ((Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow) || moveUp) && !moveDown)
         {
             transform.Translate(Vector3.up * cameraSpeed * Time.deltaTime);
         }
-        if ((Input.GetKey(KeyCode.A) || moveLeft) && !moveRight)
+        if ((Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow) || moveLeft) && !moveRight)
         {
             transform.Translate(Vector3.left * cameraSpeed * Time.deltaTime);
         }
-        if ((Input.GetKey(KeyCode.S) || moveDown) && !moveUp)
+        if ((Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow) || moveDown) && !moveUp)
         {
             transform.Translate(Vector3.down * cameraSpeed * Time.deltaTime);
         }
-        if ((Input.GetKey(KeyCode.D) || moveRight) && !moveLeft)
+        if ((Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow) || moveRight) && !moveLeft)
         {
             transform.Translate(Vector3.right * cameraSpeed * Time.deltaTime);
         }

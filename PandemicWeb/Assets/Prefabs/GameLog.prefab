@@ -531,8 +531,9 @@ GameObject:
   - component: {fileID: 2493346158615632883}
   - component: {fileID: 4353291598177165955}
   - component: {fileID: 2471244094413216208}
+  - component: {fileID: 4936472524304905391}
   m_Layer: 5
-  m_Name: TextLog
+  m_Name: TextGameLog
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -555,7 +556,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 347.1, y: 518.2}
+  m_SizeDelta: {x: 334.4, y: 516.4}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4353291598177165955
 CanvasRenderer:
@@ -598,4 +599,51 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 1
     m_LineSpacing: 1
-  m_Text: Sample Log
+  m_Text: "Lorem ipsum dolor sit amet, quidam ceteros dissentiunt ne per, duo no cetero
+    utamur. Quo ipsum facete an, errem quaerendum an vix, id ipsum timeam blandit
+    vim. Amet animal at vis. Ornatus cotidieque eu pri, nibh repudiare molestiae qui
+    eu. At virtute molestiae qui, per suscipit accusamus ea.\r\n\r\nIdque error est
+    eu, mel ut nisl elaboraret. Legere utroque quaerendum an pri. Eam in ipsum aeque.
+    Duo tota graecis interpretaris et, ne sea mucius phaedrum conclusionemque, modus
+    mandamus mel an. Postea audiam complectitur nam ex, est vero elitr ei. Mea ex
+    dicunt erroribus torquatos, ex partem maiorum erroribus vix, vidit vocent pro
+    cu.\r\n\r\nPartem postulant vim ut. Fabulas rationibus ne pro. Phaedrum legendos
+    mel ad, duo ut dignissim omittantur. Sed tempor abhorreant disputando ad.\r\n\r\nEros
+    eirmod deseruisse ius ei, eu his dicat iracundia sententiae, ei omnis conceptam
+    ius. Everti consequuntur duo eu, nec ut quis alii tation. Ne dicant causae duo,
+    has an dicat latine interesset. Ei mei unum eius etiam, at inermis epicurei per,
+    cum at perfecto comprehensam.\r\n\r\nMeliore dissentiunt liberavisse per te, gubergren
+    appellantur usu no. Duo ea munere consulatu, nulla tollit in has. Sit erroribus
+    complectitur mediocritatem ne, ex everti electram sea, ei choro noster antiopam
+    cum. Nec persius minimum nominati ne, id principes voluptatum scribentur qui,
+    postea mandamus no per.\r\n\r\nDico voluptua molestiae usu ne, in essent tractatos
+    adolescens vel, at falli recteque abhorreant sed. Usu minimum assueverit referrentur
+    ei. Pericula urbanitas eum in, eu vix nisl dolore argumentum. Usu inani mentitum
+    quaestio at, veri ceteros pertinax usu id.\r\n\r\nId eos erat paulo omittantur.
+    Sed tantas veritus voluptatibus te, scaevola salutatus comprehensam mea no. Vix
+    altera necessitatibus id. Ne eros recteque disputando pro, quot tractatos theophrastus
+    vix no. Tota tollit aliquam et his, lobortis mandamus nec no, an urbanitas honestatis
+    mediocritatem per. Has eu nulla ubique putant, persius facilis appellantur ei
+    nec, ea amet agam eleifend sit.\r\n\r\nId menandri gloriatur eum, ei mei porro
+    lorem indoctum, usu odio magna in. In scripta copiosae appellantur eam. Mea ut
+    odio postulant laboramus. Est ne dicat soluta similique. Erroribus dignissim mel
+    id, ea nam maiorum instructior. No ipsum eruditi his, ei veniam eirmod usu.\r\n\r\nMelius
+    assentior incorrupte ius in, et mel veri debitis facilisis. Invidunt detraxit
+    suavitate mei et, usu cu fuisset elaboraret. Suas fugit senserit sed an. Ei iusto
+    partiendo qui.\r\n\r\nEos ei lorem oportere, augue interpretaris conclusionemque
+    per ut, ius feugait eloquentiam ne. Quo graeci regione ea, qui adolescens interesset
+    ut. Mei ea oportere pericula periculis, eos id primis efficiendi. Ex tantas persius
+    inciderint vix, id quo idque essent, ei purto bonorum est. Sea eu rebum accusamus
+    contentiones"
+--- !u!114 &4936472524304905391
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4936472524304905390}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 792145c18801fa5429aed0bbca39cd1b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 

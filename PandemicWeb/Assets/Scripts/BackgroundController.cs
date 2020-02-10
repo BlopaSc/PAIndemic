@@ -10,12 +10,22 @@ public class BackgroundController : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        ModifyVisibility(false);
+        ModifyVisibility(true);
+        showInformation = false;
     }
 
     // Update is called once per frame
     void Update()
     {
+        if(Input.GetKey(KeyCode.Escape))
+        {
+            ModifyVisibility(true);
+            showInformation = false;
+        }
+        if (Input.GetKey(KeyCode.Return))
+        {
+            ModifyVisibility(false);
+        }
         if(Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
         {
             if (!showInformation)
@@ -40,7 +50,8 @@ public class BackgroundController : MonoBehaviour
         GameObject.Find("InfectionDeckDiscard").GetComponent<Text>().enabled = visibility;
         GameObject.Find("InfectionDeckPiles").GetComponent<Text>().enabled = visibility;
         GameObject.Find("PlayerDeckDiscard").GetComponent<Text>().enabled = visibility;
-        GameObject.Find("TextTurnInformation").GetComponent<Text>().enabled = visibility;
+        GameObject.Find("GameControls").GetComponent<Text>().enabled = visibility;
+        GameObject.Find("ToggleSkipAction").transform.localScale = visibility ? new Vector3(1, 1, 1) : new Vector3(0, 0, 0);
         GameObject.Find("GameLog").transform.localScale = visibility? new Vector3(1, 1, 1):new Vector3(0, 0, 0);
         GameManager.LoseFocus();
     }
