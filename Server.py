@@ -4,8 +4,8 @@
 """
 
 from city_cards import city_cards
-from Game import Game,Player,TurnPhase,GameState
-from Players import RandomPlayer
+from Game import Game,Player,PlayerRole,TurnPhase,GameState
+from Players import RandomPlayer,PlanningPlayer
 
 import http.server as BaseHTTPServer
 import socketserver as SocketServer
@@ -29,9 +29,27 @@ log_games = False
 HOST_NAME = "127.0.0.1"
 PORT_NUMBER = 31337
 
+if any(arg=='-s' for arg in sys.argv):
+	print("Running in server mode")
+	# Google cloud computing
+	HOST_NAME = "0.0.0.0"
+	PORT_NUMBER = 80
+	debug = False
+	
+if any(arg=='-l' for arg in sys.argv):
+	print("Logging games")
+	log_games = True
+
 # Logs
 errlog = sys.stdout if debug else open("server.log","w")
-gameresults = open("game_results.log","a")
+if os.path.exists("game_results.log"):
+	gameresults = open("game_results.log","a")
+else:
+	gameresults = open("game_results.log","w")
+	#gid, pid, time_taken, participants info, won/loss, cures_found, eradicated_diseases, pcards_remaining, outbreaks, disease_cubes_remaining x4
+	gameresults.write('gid,pid,time_taken,result,game_turn,cures_discovered,eradicated_diseases,pcards_remaining,outbreaks,dcubes_red,dcubes_yellow,dcubes_blue,dcubes_black,AI,seed,roleH,roleC\n')
+	gameresults.flush()
+	
 
 # Required to keep track of games and locking
 games = {}
@@ -39,7 +57,15 @@ participants = {}
 gamelock = threading.Lock()
 
 # Types of computer players
-computers = [RandomPlayer]
+computers = [PlanningPlayer]
+roles = [[PlayerRole.SCIENTIST,PlayerRole.MEDIC],
+		 [PlayerRole.SCIENTIST,PlayerRole.RESEARCHER],
+		 [PlayerRole.SCIENTIST,PlayerRole.QUARANTINE_SPECIALIST],
+		 [PlayerRole.MEDIC,PlayerRole.RESEARCHER],
+		 [PlayerRole.MEDIC,PlayerRole.QUARANTINE_SPECIALIST],
+		 [PlayerRole.RESEARCHER,PlayerRole.QUARANTINE_SPECIALIST]
+	 ]
+seeds = [6, 7, 13, 17, 21, 512, 777]
 
 # Used to kill the server + games when Control+C on server process
 def signal_handler(signal, frame):
@@ -81,7 +107,7 @@ class ServerGame(Game):
 	def close_game(self):
 		print(time.asctime() + " Closing game: "+self.gid)
 		if log_games:
-			self.logger.close()
+			self.commons['logger'].close()
 
 # Handler for the server
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -129,6 +155,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		if self.path.startswith("/tutorial"):
 			self.send_text("html/tutorial.html")
 			return
+		if self.path.startswith("/pandemic"):
+			self.send_text("html/pandemic.html")
+			return
 		if (self.path.startswith("/build/") or self.path.startswith("/images/")) and ".." not in self.path:
 			fname = self.path[1:]
 			if os.path.exists(fname) and os.path.isfile(fname):
@@ -147,16 +176,17 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 			gamelock.acquire()
 			pid = self.getgid()
 			ai = random.choice(computers)
+			role = random.choice(roles)
+			seed = random.choice(seeds)
+			random.shuffle(role)
 			# TODO: In participants save information regarding randomness selection and player roles
-			participants[pid] = [ai.__name__]
+			participants[pid] = [ai.__name__,str(seed),role[0].name,role[1].name]
 			gid = self.getgid()
 			game = ServerGame(gid,[Player(),ai()])
 			games[gid] = game
 			gamelock.release()
 			game.setup()
-			if game.current_player != 0:
-				game.game_turn()
-			game.start_turn()
+			game.game_advance()
 			game_state = game()
 			game_state.update({"gid": gid, "pid": pid})
 			game_state = json.dumps(game_state,indent="\t").split('\n')	
@@ -202,38 +232,38 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 				# Player must perform action
 				elif game.turn_phase==TurnPhase.ACTIONS:
 					game.do_action(action,get_dictionary)
-					# If the action produces the end of action phase, then do draw step
-					if game.turn_phase==TurnPhase.DRAW:
-						# Might get the turn phase to Discard or Infect
-						game.draw_phase()
-				# Be it with the Discard phase or the Action phase, if it ends in Infect phase, perform
-				if game.turn_phase==TurnPhase.INFECT:
-					# After infection, turn phase is new
-					game.end_turn()
+				game.game_advance()
 			# Player receives update up to after infection phase, must request "waiting" for AI to execute
 			else:
-				if game.turn_phase == TurnPhase.NEW:
-					game.start_turn()
-				while game.turn_phase == TurnPhase.ACTIONS:
+				while game.current_player!=0 and game.turn_phase == TurnPhase.ACTIONS:
 					action, kwargs = game.players[game.current_player].request_action(game)
 					game.do_action(action,kwargs)
-				if game.turn_phase==TurnPhase.DRAW:
-					game.draw_phase()
-				while game.turn_phase==TurnPhase.DISCARD:
+				game.game_advance()
+				while game.current_player!=0 and game.turn_phase==TurnPhase.DISCARD:
 					discard = game.players[game.current_player].request_discard(game)
 					game.do_discard(discard)
-				if game.turn_phase==TurnPhase.INFECT:
-					game.end_turn()
-				if game.turn_phase==TurnPhase.NEW:
-					game.start_turn()
+				game.game_advance()
 			self.ok("text/json")
 			game_state = json.dumps(game(),indent="\t").split('\n')
 			for line in game_state:
 				self.writestring(line)
 			if game.game_state==GameState.LOST or game.game_state==GameState.WON:
 				# Saves game results to game_results.log
-				gameresults.write(",".join([gid, pid, str(time.time() - game.time_init),*[str(param) for param in participants[pid]],game.game_state.name,str(sum(list(game.cures.values()))),str(sum(list(game.eradicated.values()))),str(len(game.player_deck.deck)),str(game.outbreak_counter),*[str(value) for value in game.remaining_disease_cubes.values()]])+"\n")
-				# Results: gid, pid, time_taken, participants info, won/loss, cures_found, eradicated_diseases, pcards_remaining, outbreaks, disease_cubes_remaining x4
+				gameresults.write(",".join([
+						gid,
+						pid,
+						str(time.time() - game.time_init),
+						game.game_state.name,
+						str(game.current_turn),
+						str(sum(list(game.cures.values()))),
+						str(sum(list(game.eradicated.values()))),
+						str(game.player_deck.remaining),
+						str(game.outbreak_counter),
+						*[str(game.remaining_disease_cubes[color]) for color in ['red','yellow','blue','black']],
+						*[str(param) for param in participants[pid]]
+					])+"\n"
+				)
+				gameresults.flush()
 				# TODO: record player answers to survey
 			return
 		self.send_response(400)
