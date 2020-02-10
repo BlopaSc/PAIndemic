@@ -43,7 +43,7 @@ class TurnPhase(IntEnum):
 	INFECT = auto()
 
 
-class Game():
+class Game:
 	
 	def __repr__(self):
 		s = "Turn: "+str(self.current_turn)+", Current player: "+str(self.players[self.current_player].playerrole.name)+", Out.Counter: "+str(self.outbreak_counter)+", Inf.Counter: "+str(self.infection_counter)+", Inf.Rate: "+str(self.infection_rate)+"\n"
@@ -109,6 +109,10 @@ class Game():
 		cities_deck.extend(event_deck)
 		self.player_deck = PlayerDeck(cities_deck)
 		self.actions = 0
+		# Calculate max turns
+		self.commons['max_turns'] = 1 + ((len(cities_deck)+epidemic_cards-((6-len(self.players))*len(self.players)))//2)
+		# Create PRNG
+		self.prng = random.Random()
 		# Turn controls
 		self.current_player = -1
 		self.current_turn = -1
@@ -127,8 +131,7 @@ class Game():
 				tuple(self.eradicated.values()),
 				tuple(self.remaining_disease_cubes.values()),
 				tuple(p.get_id() for p in self.players),
-				tuple(c.get_id() for c in self.cities.values()),
-				self.actions
+				tuple(c.get_id() for c in self.cities.values())
 		  )
 	
 	def log(self,new_log):
@@ -136,8 +139,68 @@ class Game():
 			self.commons['game_log'] += new_log+"\n"
 		if self.commons['logger'] is not None:
 			self.commons['logger'].write(new_log+"\n")
+			self.commons['logger'].flush()
 	
-	def setup(self,players_roles=None):
+	def load_from_log(self,filename):
+		with open(filename,'r') as file:
+			players_roles,seed = None,None
+			lines = file.readlines()
+			for l,line in enumerate(lines):
+				line=line[:-1]
+				if line.startswith("Seed"):
+					seed = int(line[line.find('=')+1:])
+				elif line.startswith("Roles"):
+					roles = {role.name: role for role in list(PlayerRole)}
+					players_roles = [roles[name] for name in line[line.find('=')+1:].split(',')]
+				elif line.startswith("Setting game up"):
+					self.setup(players_roles,seed)
+					players_roles,seed = None,None
+				elif line.find("discarded")!=-1:
+					if self.turn_phase == TurnPhase.DISCARD:
+						self.do_discard(line[line.find(':')+2:])
+				elif line.find("drove")!=-1:
+					self.do_action(Player.drive_ferry.__name__,{"target":line[line.find(':')+2:]})
+				elif line.find("direct flew")!=-1:
+					self.do_action(Player.direct_flight.__name__,{"target":line[line.find(':')+2:]})
+				elif line.find("charter flew")!=-1:
+					self.do_action(Player.charter_flight.__name__,{"target":line[line.find(':')+2:]})
+				elif line.find("shuttle flew")!=-1:
+					self.do_action(Player.shuttle_flight.__name__,{"target":line[line.find(':')+2:]})
+				elif line.find("built research station")!=-1:
+					replace = lines[l+1][lines[l+1].find(':')+2:-1] if (l+1)<len(lines) and lines[l+1].find("removed research station")!=-1 else 'none'
+					self.do_action(Player.build_researchstation.__name__,{'replace':replace})
+				elif line.find("treated")!=-1:
+					self.do_action(Player.treat_disease.__name__,{"color":line[line.find(':')+2:]})
+				elif line.find("gave")!=-1:
+					pid = -1
+					for p in self.players:
+						if p.playerrole.name == line[line.find(':')+2:]:
+							pid = p.pid
+					self.do_action(Player.give_knowledge.__name__,{'receiver':pid,'target':line[line.find("gave")+5:line.find(" to: ")]})
+				elif line.find("received")!=-1:
+					pid = -1
+					for p in self.players:
+						if p.playerrole.name == line[line.find(':')+2:]:
+							pid = p.pid
+					self.do_action(Player.receive_knowledge.__name__,{'giver':pid,'target':line[line.find("received")+9:line.find(" from: ")]})
+				elif line.find("discovered cure")!=-1:
+					cards = []
+					for i in range(1,6 - (self.players[self.current_player].playerrole==PlayerRole.SCIENTIST)):
+						if lines[l+i].find("discarded")!=-1:
+							cards.append(lines[l+i][lines[l+i].find(':')+2:-1])
+					self.do_action(Player.discover_cure.__name__,{'color':line[line.find(':')+2:], 'chosen_cards':cards})
+				# TODO: Implement other possible actions: rally, special charter flight
+				self.game_advance()
+	
+	def setup(self,players_roles=None,seed=None):
+		if players_roles is not None:
+			txt="Roles="
+			for role in players_roles:
+				txt+=role.name+","
+			self.log(txt[:-1])
+		if seed is not None:
+			self.prng.seed(seed)
+			self.log("Seed="+str(seed))
 		self.log("Setting game up")
 		if players_roles is None or len(players_roles)!=len(self.players):
 			roles = list(PlayerRole)
@@ -147,7 +210,7 @@ class Game():
 			roles.remove(PlayerRole.DISPATCHER)
 			# REMOVED OPERATIONS_EXPERT BECAUSE OF SEARCH SPACE EXPLOSION
 			roles.remove(PlayerRole.OPERATIONS_EXPERT)
-			players_roles = random.sample(roles,len(self.players))
+			players_roles = self.prng.sample(roles,len(self.players))
 		# Player setup
 		for p,player in enumerate(self.players):
 			player.pid = p
@@ -158,7 +221,6 @@ class Game():
 			self.player_deck.discard.extend(player.cards)
 			player.cards = []
 			player.colors = {color:0 for color in self.commons['colors']}
-			player.colors[None] = 0
 		# City setup
 		for c in self.cities:
 			city = self.cities[c]
@@ -167,6 +229,8 @@ class Game():
 				city.disease_cubes[color] = 0
 			city.research_station = False
 		self.cities[self.commons['starting_city']].research_station = True
+		self.cities_rs = [self.commons['starting_city']]
+		self.distances = {}
 		self.calculate_distances()
 		# Set counters
 		self.remaining_disease_cubes = {color: self.commons['number_cubes'] for color in self.commons['colors']}
@@ -182,8 +246,9 @@ class Game():
 		# Removes epidemic cards
 		self.player_deck.deck = [card for pile in self.player_deck.deck for card in pile if card.cardtype != CardType.EPIDEMIC]
 		self.player_deck.deck.extend(self.player_deck.discard)
+		self.player_deck.deck.sort(key = lambda x: str(x))
 		self.player_deck.discard = []
-		random.shuffle(self.player_deck.deck)
+		self.prng.shuffle(self.player_deck.deck)
 		# Deal players' hands
 		for player in self.players:
 			for c in range(6-len(self.players)):
@@ -206,7 +271,7 @@ class Game():
 			subpiles[index%self.commons['epidemic_cards']].append(card)
 		self.player_deck.deck = []
 		for pile in subpiles:
-			random.shuffle(pile)
+			self.prng.shuffle(pile)
 			self.player_deck.deck.append(pile)
 		self.player_deck.remaining = sum(len(p) for p in self.player_deck.deck)
 		self.player_deck.expecting_epidemic = True
@@ -220,17 +285,19 @@ class Game():
 		# Prepare infection deck
 		single_pile = [card for pile in self.infection_deck.deck for card in pile]
 		single_pile.extend(self.infection_deck.discard)
-		random.shuffle(single_pile)
+		single_pile.sort(key = lambda x: str(x))
+		self.prng.shuffle(single_pile)
 		self.infection_deck.deck = [single_pile]
 		self.infection_deck.discard = []
 		# Set initial infections
 		for i in range(9):
 			city = self.cities[self.infection_deck.draw().name]
-			city.infect(self,infection=(i//3)+1,color=city.color)
+			city.infect(self,infection=(i//3)+1,color=city.color,outbreak_chain=[])
 		# Post setup players
 		for player in self.players:
 			player.move_triggers(self)
 		# Start game
+		self.rstate=self.prng.getstate()
 		self.commons['error_flag'] = False
 		self.commons['game_log'] = ""
 		self.current_player = starting_player
@@ -263,6 +330,7 @@ class Game():
 						city_distances[key][neighbor] = new_distance
 				unvisited.remove(current_node)
 		self.distances = city_distances
+		self.total_distances = sum(sum(d.values()) for d in self.distances.values())
 	
 	def lost(self):
 		return self.player_deck.remaining<0 or min(self.remaining_disease_cubes.values())<0 or self.outbreak_counter>=8
@@ -297,7 +365,7 @@ class Game():
 					print(self.players[self.current_player])
 					print("Tried to do:",action,kwargs)
 					print("In game state:",self)
-					input("CONTINUE")
+					self.commons['error_flag']=True
 			except:
 				print("Error, wrong function or something.")
 				print(action)
@@ -308,9 +376,9 @@ class Game():
 			if self.won():
 				self.turn_phase = TurnPhase.INACTIVE
 				self.game_state = GameState.WON
+				self.log("Players have WON the game")
 		else:
 			print("Invalid do action, current turn phase: "+self.turn_phase.name)
-			input("CONTINUE")
 		return valid
 	
 	def draw_phase(self):
@@ -322,6 +390,7 @@ class Game():
 			if self.lost():
 				self.turn_phase = TurnPhase.INACTIVE
 				self.game_state = GameState.LOST
+				self.log("Players have LOST the game")
 			elif self.players[self.current_player].must_discard():
 				self.turn_phase = TurnPhase.DISCARD
 			else:
@@ -356,17 +425,27 @@ class Game():
 				city_name = self.infection_deck.draw().name
 				self.cities[city_name] = copy.copy(self.cities[city_name])
 				city = self.cities[city_name]
-				city.infect(self,infection=1,color=city.color)
+				city.infect(self,infection=1,color=city.color,outbreak_chain=[])
 			self.current_player = (self.current_player+1)%len(self.players)
 			if self.lost():
 				self.turn_phase = TurnPhase.INACTIVE
 				self.game_state = GameState.LOST
+				self.log("Players have LOST the game")
 			else:
 				self.current_turn += 1
 				self.turn_phase = TurnPhase.NEW
 		else:
 			print("Invalid end turn, current turn phase: "+self.turn_phase.name)
 		return valid
+	
+	def game_advance(self):
+		while self.turn_phase not in [TurnPhase.INACTIVE, TurnPhase.ACTIONS, TurnPhase.DISCARD]:
+			if self.turn_phase == TurnPhase.NEW:
+				self.start_turn()
+			if self.turn_phase==TurnPhase.DRAW:
+				self.draw_phase()
+			if self.turn_phase == TurnPhase.INFECT:
+				self.end_turn()
 	
 	def game_turn(self):
 		if self.turn_phase == TurnPhase.NEW:
@@ -397,7 +476,7 @@ class Game():
 		else:
 			self.log("This should not happen")
 	
-class Card(object):
+class Card:
 	def __repr__(self):
 		return self.name
 	
@@ -409,7 +488,7 @@ class Card(object):
 	def __eq__(self,other):
 		return self.name == other
 	
-class City():
+class City:
 	def __repr__(self):
 		return self.name+": Diseases: "+str([color+"="+str(self.disease_cubes[color]) for color in self.disease_cubes]) + " R.S: "+str(1 if self.research_station else 0)
 	
@@ -432,7 +511,7 @@ class City():
 				self.research_station
 		)
 	
-	def infect(self,game,infection,color,outbreak_chain=[]):
+	def infect(self,game,infection,color,outbreak_chain):
 		if not game.eradicated[color] and self.name not in game.protected_cities and not (game.medic_position==self.name and game.cures[color]):
 			net_infection = min(3-self.disease_cubes[color],infection)
 			self.disease_cubes = copy.copy(self.disease_cubes)
@@ -462,7 +541,7 @@ class City():
 			game.eradicated[color] = True
 			game.log("Eradicated "+color+" disease")
 	
-class Player():
+class Player:
 	def __repr__(self):
 		return self.playerrole.name+" Current location: "+str(self.position)+" - Cards: "+str(self.cards)
 	
@@ -500,9 +579,9 @@ class Player():
 				game.cities = copy.copy(game.cities)
 				game.cities[city_name] = copy.copy(game.cities[city_name])
 				city = game.cities[city_name]
-				city.infect(game,infection=3,color=city.color)
+				city.infect(game,infection=3,color=city.color,outbreak_chain=[])
 				# Shuffle infect discard pile
-				game.infection_deck.intensify()
+				game.infection_deck.intensify(game)
 			elif card.cardtype != CardType.MISSING:
 				game.log(self.playerrole.name+" drew: "+card.name)
 				self.colors = copy.copy(self.colors)
@@ -527,11 +606,7 @@ class Player():
 			game.protected_cities.extend(game.cities[self.position].neighbors)
 	
 	def must_discard(self):
-		if self.playerrole == PlayerRole.CONTINGENCY_PLANNER:
-			# TODO: Check if contingency planner has kept additional card
-			return len(self.cards)>7
-		else:
-			return len(self.cards)>7
+		return len(self.cards)>7
 		
 	def no_action(self):
 		return True
@@ -580,7 +655,7 @@ class Player():
 		elif game.turn_phase==TurnPhase.DISCARD:
 			actions[self.discard.__name__] = [{'discard':card.name} for card in self.cards]
 		return actions
-	
+
 	# Card is a string with the card name
 	def discard(self,game,card):
 		valid = card in self.cards
@@ -641,9 +716,11 @@ class Player():
 		if valid:
 			game.log(self.playerrole.name+" built research station")
 			game.cities = copy.copy(game.cities)
+			game.cities_rs = copy.copy(game.cities_rs)
 			if game.research_station_counter == 6:
 				game.cities[replace] = copy.copy(game.cities[replace])
 				game.cities[replace].research_station = False
+				game.cities_rs.remove(replace)
 				game.log(self.playerrole.name+" removed research station at: "+replace)
 			else:
 				game.research_station_counter += 1
@@ -651,6 +728,7 @@ class Player():
 				self.discard(game,self.position)
 			game.cities[self.position] = copy.copy(game.cities[self.position])
 			game.cities[self.position].research_station = True
+			game.cities_rs.append(self.position)
 			game.calculate_distances()
 		return valid
 	
@@ -664,6 +742,21 @@ class Player():
 			game.cities[self.position].disinfect(game,game.cities[self.position].disease_cubes[color] if (self.playerrole == PlayerRole.MEDIC or game.cures[color]) else 1 ,color)
 		return valid
 	
+	def transfer_card(self,game,target,receiver,giver):
+		giver.cards = copy.copy(giver.cards)
+		giver.colors = copy.copy(giver.colors)
+		receiver.cards = copy.copy(receiver.cards)
+		receiver.colors = copy.copy(receiver.colors)
+		card = giver.cards.pop(giver.cards.index(target))
+		receiver.cards.append(card)
+		giver.colors[card.color]-=1
+		receiver.colors[card.color]+=1
+		if receiver.must_discard():
+			game.log(receiver.playerrole.name+" must discard")
+			game.real_current_player = game.current_player
+			game.current_player = receiver.pid
+			game.turn_phase = TurnPhase.DISCARD
+	
 	# Receiver is pid number, target is string object
 	def give_knowledge(self,game,receiver,target):
 		game.players[receiver  % len(game.players)] = copy.copy(game.players[receiver  % len(game.players)])
@@ -671,14 +764,7 @@ class Player():
 		valid = receiver_player!=self and self.position==receiver_player.position and target in self.cards and (self.position==target or self.playerrole==PlayerRole.RESEARCHER)
 		if valid:
 			game.log(self.playerrole.name+" gave "+target+" to: "+receiver_player.playerrole.name)
-			receiver_player.cards = copy.copy(receiver_player.cards)
-			self.cards = copy.copy(self.cards)
-			receiver_player.cards.append(self.cards.pop(self.cards.index(target)))
-			if receiver_player.must_discard():
-				game.log(receiver_player.playerrole.name + " must discard")
-				game.real_current_player = game.current_player
-				game.current_player = receiver
-				game.turn_phase = TurnPhase.DISCARD
+			self.transfer_card(game,target,receiver_player,self)
 		return valid
 	
 	# Giver is pid number, target is string object
@@ -688,20 +774,14 @@ class Player():
 		valid = giver!=self and self.position==giver.position and target in giver.cards and (self.position==target or giver.playerrole==PlayerRole.RESEARCHER)
 		if valid:
 			game.log(self.playerrole.name+" received "+target+" from: "+giver.playerrole.name)
-			giver.cards = copy.copy(giver.cards)
-			self.cards = copy.copy(self.cards)
-			self.cards.append(giver.cards.pop(giver.cards.index(target)))
-			if self.must_discard():
-				game.log(self.playerrole.name + " must discard")
-				game.real_current_player = game.current_player
-				game.turn_phase = TurnPhase.DISCARD
+			self.transfer_card(game,target,self,giver)
 		return valid
 	
 	# Color is a string object, chosen_cards is an array containing string objects
 	def discover_cure(self,game,color,chosen_cards):
 		valid = game.cities[self.position].research_station and len(chosen_cards)==(4 if self.playerrole==PlayerRole.SCIENTIST else 5) and all([(card in self.cards and self.cards[self.cards.index(card)].cardtype==CardType.CITY and game.cities[card].color==color) for card in chosen_cards])
 		if valid:
-			game.log(self.playerrole.name+" found cure for: "+color)
+			game.log(self.playerrole.name+" discovered cure for: "+color)
 			for card in chosen_cards:
 				self.discard(game,card)
 			game.cures = copy.copy(game.cures)
@@ -741,7 +821,7 @@ class Player():
 	def use_event(self,event):
 		pass
 	
-class PlayerDeck():
+class PlayerDeck:
 	def __repr__(self):
 		return "Expecting epidemic: "+str(1 if self.expecting_epidemic else 0)+", Next epidemic in: "+str(self.epidemic_countdown)+", Remaining cards: "+str(self.remaining)
 	
@@ -784,20 +864,26 @@ class PlayerDeck():
 		return card
 	
 	@property
-	def possible_deck(self):
+	def chances_epidemic(self):
+		if self.epidemic_countdown>=2:
+			return self.expecting_epidemic*2/len(self.deck[-1])
+		else:
+			return ((self.remaining>=2)/len(self.deck[-2])) + self.expecting_epidemic
+	
+	def get_possible_deck(self,prng):
 		pile_info = [[len(pile),any([card.cardtype==CardType.EPIDEMIC for card in pile])] for pile in self.deck]		
 		cards = [card for pile in self.deck for card in pile if card.cardtype != CardType.EPIDEMIC]
 		deck = []
-		random.shuffle(cards)
+		prng.shuffle(cards)
 		for p in pile_info:
 			pile = [Card(name="Epidemic",cardtype=CardType.EPIDEMIC,color="epidemic")] if p[1] else []
 			for c in range(len(pile),p[0]):
 				pile.append(cards.pop())
-			random.shuffle(pile)
+			prng.shuffle(pile)
 			deck.append(pile)
 		return deck
 	
-class InfectionDeck():
+class InfectionDeck:
 	def __repr__(self):
 		return "Possible next cards: "+str(self.known_cards)
 	
@@ -831,10 +917,12 @@ class InfectionDeck():
 		self.discard.append(city)
 		return city
 	
-	def intensify(self):
+	def intensify(self,game):
 		self.deck = copy.copy(self.deck)
 		self.discard = copy.copy(self.discard)
-		random.shuffle(self.discard)
+		game.prng.setstate(game.rstate)
+		game.prng.shuffle(self.discard)
+		game.rstate=game.prng.getstate()
 		self.deck.append(self.discard)
 		self.discard = []
 		
@@ -845,18 +933,29 @@ class InfectionDeck():
 			pile.sort()
 		return known_cards
 		
-	@property
-	def possible_deck(self):
+	def get_possible_deck(self,prng):
 		deck = []
 		for pile in self.deck:
 			new_pile = copy.copy(pile)
-			random.shuffle(new_pile)
+			prng.shuffle(new_pile)
 			deck.append(new_pile)
 		return deck
 
 if __name__ == '__main__':
-	from Players import RandomPlayer
-	game = Game([RandomPlayer(),RandomPlayer()],external_log=sys.stdout)
-	game.setup()
-	print(game)
-	game.game_loop()
+	from Players import RandomPlayer,PlanningPlayer
+	file = open("logtest.txt","w") if True else sys.stdout
+	game = Game([RandomPlayer(),RandomPlayer()],external_log=file)
+	game.setup(players_roles=[PlayerRole.SCIENTIST,PlayerRole.RESEARCHER],seed=21)
+	for i in range(10):
+		game.game_turn()
+	game.game_advance()
+	if file != sys.stdout:
+		file.close()
+		fid = hash(game.get_id())
+		print("Game id:",fid)
+		game2 = Game([RandomPlayer(),RandomPlayer()],external_log=sys.stdout)
+		game2.load_from_log("logtest.txt")
+		sid = hash(game2.get_id())
+		print("Game id:",sid)
+		print("Equal?",fid==sid)
+	
