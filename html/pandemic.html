@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>PAIndemic | Unity WebGL Player</title>
+    <link rel="shortcut icon" href="build/TemplateData/favicon.ico">
+    <link rel="stylesheet" href="build/TemplateData/style.css">
+    <script src="build/TemplateData/UnityProgress.js"></script>
+    <script src="build/Build/UnityLoader.js"></script>
+    <script>
+      var unityInstance = UnityLoader.instantiate("unityContainer", "build/Build/build.json", {onProgress: UnityProgress});
+    </script>
+  </head>
+  <body>
+    <div class="webgl-content"style="width: 80%; height: 80%">
+      <div id="unityContainer" style="width: 100%; height: 100%"></div>
+      <div class="footer">
+        <div class="webgl-logo"></div>
+        <div class="fullscreen" onclick="unityInstance.SetFullscreen(1)"></div>
+        <div class="title">PAIndemic</div>
+      </div>
+    </div>
+  </body>
+</html>
