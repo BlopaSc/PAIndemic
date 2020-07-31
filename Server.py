@@ -5,7 +5,7 @@
 
 from city_cards import city_cards
 from Game import Game,Player,PlayerRole,TurnPhase,GameState
-from Players import RandomPlayer,PlanningPlayer,PlanRecognitionPlayer
+from Players import RandomPlayer,HeuristicPlayer,PlanningPlayer
 
 import http.server as BaseHTTPServer
 import socketserver as SocketServer
@@ -63,7 +63,7 @@ gamelock = threading.Lock()
 
 # Due to limitations with the number of participants less combinations will be used
 # Types of computer players
-computers = [PlanningPlayer,PlanRecognitionPlayer]
+computers = [PlanningPlayer]
 roles = [
 		[PlayerRole.SCIENTIST,PlayerRole.MEDIC],
 		 [PlayerRole.SCIENTIST,PlayerRole.RESEARCHER],
