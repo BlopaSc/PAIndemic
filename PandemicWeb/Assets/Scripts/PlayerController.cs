@@ -1,91 +1,73 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class PlayerController : MonoBehaviour
 {
     [SerializeField]
-    private Vector3 positionOffset = new Vector3(0,0,0);
-    private string location;
-
-    private ArrayList myCards;
-
+    private GameObject currentCity;
     [SerializeField]
-    private GameObject myCanvasFirstRow = null;
+    private Vector3 offset;
     [SerializeField]
-    private GameObject myCanvasSecondRow = null;
+    private GameObject myCardGroup;
 
+    private Vector3 fromLocation, toLocation;
+    private float tStart;
+    private bool moving;
 
     // Start is called before the first frame update
     void Start()
     {
-        this.myCards = new ArrayList();
+        moving = false;
+        transform.position = currentCity.transform.position + offset;
     }
 
     // Update is called once per frame
     void Update()
     {
-        
-    }
-
-    public void SetLocation(string newLocation)
-    {
-        GameObject city = GameObject.Find(newLocation);
-        if(city != null)
+        if (moving)
         {
-            this.location = newLocation;
-            this.transform.position = city.transform.position + this.positionOffset;
-        }
-    }
-
-    public void SetCards(ArrayList newCards)
-    {
-        
-        ArrayList removeList = new ArrayList();
-        foreach(string card in this.myCards)
-        {
-            if(!newCards.Contains(card))
+            float ttime = (Time.time - tStart) / GameManager.eventTime;
+            transform.position = Vector3.Lerp(fromLocation, toLocation, ttime);
+            if (ttime >= 1.0)
             {
-                GameObject.Destroy(GameObject.Find("Card_" + card));
-                removeList.Add(card);
-            }
-        }
-        foreach(string card in removeList)
-        {
-            this.myCards.Remove(card);
-        }
-        newCards.Sort();
-        int counter = 0;
-        foreach(string card in newCards)
-        {
-            if (!this.myCards.Contains(card))
-            {
-                GameObject newCard = GameObject.Instantiate(Resources.Load<GameObject>("Card"), ((counter % 2 == 0) ? this.myCanvasFirstRow : this.myCanvasSecondRow).transform);
-                newCard.name = "Card_" + card;
-                newCard.GetComponent<CardController>().SetName(card);
-                newCard.GetComponent<RectTransform>().transform.localScale = Vector3.one;
-                newCard.GetComponent<RectTransform>().localPosition = CardController.GetPosition(counter++);
-                this.myCards.Add(card);
-            }
-            else
-            {
-                GameObject.Find("Card_" + card).transform.SetParent(((counter % 2 == 0) ? this.myCanvasFirstRow : this.myCanvasSecondRow).transform);
-                GameObject.Find("Card_" + card).GetComponent<RectTransform>().localPosition = CardController.GetPosition(counter++);
+                moving = false;
             }
         }
     }
 
-    public void ResetCards()
+    public void DrawCard(string name, Vector3 from)
     {
-        foreach (string card in this.myCards)
-        {
-            GameObject.Find("Card_" + card).GetComponent<ClickActions>().ResetActions();
-        }
+        myCardGroup.GetComponent<CardGroupController>().DrawCard(name, from);
     }
 
-    public string GetLocation()
+    public void DiscardCard(string name, Vector3 to)
     {
-        return this.location;
+        myCardGroup.GetComponent<CardGroupController>().DiscardCard(name, to);
+    }
+
+    public void Goto(GameObject to)
+    {
+        currentCity = to;
+        fromLocation = transform.position;
+        toLocation = currentCity.transform.position + offset;
+        tStart = Time.time;
+        moving = true;
+    }
+
+    public GameObject GetCurrentCity()
+    {
+        return currentCity;
+    }
+
+    public GameObject GetCard(string name)
+    {
+        return myCardGroup.GetComponent<CardGroupController>().GetCard(name);
+    }
+
+    public Vector3 GetCardPosition(string name)
+    {
+        return myCardGroup.GetComponent<CardGroupController>().GetCardPosition(name);
     }
 
 }

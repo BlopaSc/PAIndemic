@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class CameraController : MonoBehaviour
 {
@@ -9,9 +7,9 @@ public class CameraController : MonoBehaviour
     public float cameraSpeed;
 
     [SerializeField]
-    private float maximumSize=0;
+    private float maximumSize = 0;
     [SerializeField]
-    private float minimumSize=0;
+    private float minimumSize = 0;
     private float zoom;
     private float xMax, yMax, sizeX, sizeY;
 
@@ -22,15 +20,16 @@ public class CameraController : MonoBehaviour
         Sprite sprite = map.GetComponent<SpriteRenderer>().sprite;
         // Initial zoom
         zoom = GetComponent<Camera>().orthographicSize;
-        // Maximum (x,y) position for the game's board
-        xMax = sprite.rect.width / 200f;
-        yMax = sprite.rect.height / 200f;
+        // Maximum (x,y) position for the game's board, add additional yMax for cards
+        // Twice 100 pixels/units
+        xMax = sprite.rect.width/200f;
+        yMax = sprite.rect.height/200f + 2f;
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (!GameManager.HasFocus() && !(Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)))
+        if (!(Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)))
         {
             zoom -= Input.GetAxis("Mouse ScrollWheel") * zoomSensitivity;
             zoom = Mathf.Clamp(zoom, minimumSize, maximumSize);
@@ -46,19 +45,19 @@ public class CameraController : MonoBehaviour
         bool moveRight = (transform.position.x + xMax) < sizeX;
         bool moveDown = (transform.position.y + sizeY) > yMax;
         bool moveUp = (transform.position.y + yMax) < sizeY;
-        if ((Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow) || moveUp) && !moveDown)
+        if ((Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) && !moveDown)
         {
             transform.Translate(Vector3.up * cameraSpeed * Time.deltaTime);
         }
-        if ((Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow) || moveLeft) && !moveRight)
+        if ((Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) && !moveRight)
         {
             transform.Translate(Vector3.left * cameraSpeed * Time.deltaTime);
         }
-        if ((Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow) || moveDown) && !moveUp)
+        if ((Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) && !moveUp)
         {
             transform.Translate(Vector3.down * cameraSpeed * Time.deltaTime);
         }
-        if ((Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow) || moveRight) && !moveLeft)
+        if ((Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) && !moveLeft)
         {
             transform.Translate(Vector3.right * cameraSpeed * Time.deltaTime);
         }

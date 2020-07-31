@@ -5,39 +5,42 @@ using UnityEngine.UI;
 
 public class CityController : MonoBehaviour
 {
-    private static readonly Vector3 quarantineOffset = new Vector3(0,0,-0.3f);
-    private static readonly Vector3 researchStationOffset = new Vector3(0,0.5f,-0.5f);
-    private static readonly Vector3 textOffset = new Vector3(0,40f,0);
-    private static GameObject canvas = null;
-    [SerializeField]
-    private string cityName="";
+
+    private static readonly Vector3 quarantineOffset = new Vector3(0, 0, -0.3f);
+    private static readonly Vector3 researchStationOffset = new Vector3(0, 0.5f, -0.5f);
+    private static readonly Vector3 textOffset = new Vector3(0, 30f, 0);
+
+    private static ArrayList cities = null;
+
     private GameObject myCityName = null;
-    private GameObject myResearchStation = null;
-    private GameObject myQuarantine = null;
+    [SerializeField]
+    private GameObject myResearchStation;
+    [SerializeField]
+    private GameObject myQuarantine;
+    [SerializeField]
     private GameObject[] myCubeStacks;
-    private bool hasResearchStation = false;
-    private bool hasQuarantine = false;
+    private int[] cubeCounters;
+
     // Start is called before the first frame update
     void Start()
     {
-        if (canvas == null)
+        // Name
+        myCityName = Instantiate(Resources.Load<GameObject>("Prefabs/CityName"));
+        myCityName.transform.SetParent(GameObject.Find("CityNames").transform);
+        myCityName.transform.SetAsFirstSibling();
+        myCityName.name = "Text_" + transform.name;
+        myCityName.GetComponent<Text>().text = GameManager.NameTransformation(transform.name);
+        // RS and quarantaine
+        if (transform.name != "atlanta") { myResearchStation.GetComponent<SpriteRenderer>().sprite = null; }
+        myQuarantine.GetComponent<SpriteRenderer>().sprite = null;
+        // Cube stacks
+        cubeCounters = new int[myCubeStacks.Length];
+        for(int i = 0; i < myCubeStacks.Length; i++)
         {
-            canvas = GameObject.Find("CityTexts");
+            cubeCounters[i] = 0;
+            myCubeStacks[i].GetComponent<SpriteRenderer>().sprite = null;
         }
-        this.myCityName = GameObject.Instantiate(Resources.Load<GameObject>("CityName"));
-        this.myCityName.transform.SetParent(canvas.transform);
-        this.myCityName.transform.SetAsFirstSibling();
-        this.myCityName.name = "Text_" + this.name;
-        this.myCityName.GetComponent<Text>().text = this.cityName;
-        this.myCubeStacks = new GameObject[4];
-        for(int i=0; i<4; i++)
-        {
-            this.myCubeStacks[i] = GameObject.Instantiate(Resources.Load<GameObject>("CubeStack"));
-            this.myCubeStacks[i].transform.SetParent(this.transform);
-            this.myCubeStacks[i].name =  GameManager.colors[i]+"Stack_" + this.name;
-            this.myCubeStacks[i].GetComponent<CubeStackController>().SetColor(GameManager.colors[i]);
-            this.myCubeStacks[i].GetComponent<CubeStackController>().SetPosition(this.transform.position,i);
-        }
+        cities.Add(this);
     }
 
     // Update is called once per frame
@@ -45,101 +48,123 @@ public class CityController : MonoBehaviour
     {
         // Updates city name position
         Vector3 position = Camera.main.WorldToScreenPoint(this.transform.position);
-        this.myCityName.transform.position = new Vector3(position.x+textOffset.x,position.y+textOffset.y,0f);
+        myCityName.transform.position = new Vector3(position.x + textOffset.x, position.y + textOffset.y, 0f);
     }
 
-    public string GetCityName()
+    public static void ResetGame()
     {
-        return cityName;
+        cities = new ArrayList();
     }
 
-    public void UpdateInfectionCubes(int yellow, int red, int blue, int black)
+    public static void ResetQuarantaines()
     {
-        for (int i = 0; i < 4; i++)
+        foreach(CityController city in cities)
         {
-            switch (GameManager.colors[i])
+            city.myQuarantine.GetComponent<SpriteRenderer>().sprite = null;
+        }
+    }
+
+    public void AddQuarantaine()
+    {
+        myQuarantine.GetComponent<SpriteRenderer>().sprite = Resources.Load<Sprite>("Images/QuarantineSymbol");
+    }
+
+    public void Infect(string color,int number)
+    {
+        for (int i = 0; i < myCubeStacks.Length; i++)
+        {
+            if (myCubeStacks[i].transform.name.ToLower().Contains(color))
             {
-                case "yellow":
-                    this.myCubeStacks[i].GetComponent<CubeStackController>().SetInfection(yellow);
-                    break;
-                case "red":
-                    this.myCubeStacks[i].GetComponent<CubeStackController>().SetInfection(red);
-                    break;
-                case "blue":
-                    this.myCubeStacks[i].GetComponent<CubeStackController>().SetInfection(blue);
-                    break;
-                case "black":
-                    this.myCubeStacks[i].GetComponent<CubeStackController>().SetInfection(black);
-                    break;
+                Sprite[] coloredBlocks = Resources.LoadAll<Sprite>("Images/Cubes_" + color);
+                cubeCounters[i] += number;
+                myCubeStacks[i].GetComponent<SpriteRenderer>().sprite = cubeCounters[i] > 0 ? coloredBlocks[cubeCounters[i]-1] : null;
+                GameObject infection = GameObject.Instantiate(Resources.Load<GameObject>("Prefabs/Infection"));
+                infection.GetComponent<SpriteRenderer>().sprite = Resources.Load<Sprite>("Images/Infection" + GameManager.NameTransformation(color));
+                infection.GetComponent<AscendingAnimationScript>().BeginAnimation(transform.gameObject, 5*GameManager.eventTime);
             }
         }
     }
 
-    public void UpdateResearchStation(bool build)
+    public void Treat(string color,int number)
     {
-        if (build)
+        for (int i = 0; i < myCubeStacks.Length; i++)
         {
-            this.BuildResearchStation();
-        }
-        else
-        {
-            this.RemoveResearchStation();
+            if (myCubeStacks[i].transform.name.ToLower().Contains(color))
+            {
+                Sprite[] coloredBlocks = Resources.LoadAll<Sprite>("Images/Cubes_" + color);
+                cubeCounters[i] -= number;
+                myCubeStacks[i].GetComponent<SpriteRenderer>().sprite = cubeCounters[i] > 0 ? coloredBlocks[cubeCounters[i] - 1] : null;
+                GameObject treatment = GameObject.Instantiate(Resources.Load<GameObject>("Prefabs/Treatment"));
+                treatment.GetComponent<AscendingAnimationScript>().BeginAnimation(transform.gameObject, 2*GameManager.eventTime);
+            }
         }
     }
 
-    private void BuildResearchStation()
+    public void Prevented()
     {
-        if (!this.hasResearchStation)
+        GameObject prevent = GameObject.Instantiate(Resources.Load<GameObject>("Prefabs/Prevent"));
+        prevent.GetComponent<EnlargeVanishAnimationScript>().BeginAnimation(transform.gameObject, 2*GameManager.eventTime);
+    }
+
+    public void Heal(string color)
+    {
+        for(int i = 0; i < myCubeStacks.Length; i++)
         {
-            this.hasResearchStation = true;
-            this.myResearchStation = GameObject.Instantiate(Resources.Load<GameObject>("ResearchStation"));
-            this.myResearchStation.transform.SetParent(this.transform);
-            this.myResearchStation.name = "RS_" + this.name;
-            this.myResearchStation.transform.position = this.transform.position + researchStationOffset;
+            if (myCubeStacks[i].transform.name.ToLower().Contains(color))
+            {
+                cubeCounters[i] = 0;
+                myCubeStacks[i].GetComponent<SpriteRenderer>().sprite = null;
+                GameObject treatment = GameObject.Instantiate(Resources.Load<GameObject>("Prefabs/Treatment"));
+                treatment.GetComponent<AscendingAnimationScript>().BeginAnimation(transform.gameObject, 2*GameManager.eventTime);
+            }
         }
     }
 
-    private void RemoveResearchStation()
+    public void Epidemic()
     {
-        if (this.hasResearchStation)
+        GameObject epidemic = GameObject.Instantiate(Resources.Load<GameObject>("Prefabs/Epidemic"));
+        epidemic.GetComponent<EnlargeVanishAnimationScript>().BeginAnimation(transform.gameObject, 4*GameManager.eventTime);
+    }
+    
+    public void Outbreak()
+    {
+        GameObject outbreak = GameObject.Instantiate(Resources.Load<GameObject>("Prefabs/Outbreak"));
+        outbreak.GetComponent<EnlargeVanishAnimationScript>().BeginAnimation(transform.gameObject, 4*GameManager.eventTime);
+    }
+
+    public void BuildRS()
+    {
+        myResearchStation.GetComponent<SpriteRenderer>().sprite = Resources.Load<Sprite>("Images/ResearchStation");
+        GameObject building = GameObject.Instantiate(Resources.Load<GameObject>("Prefabs/Build"));
+        building.GetComponent<AscendingAnimationScript>().BeginAnimation(transform.gameObject, 2*GameManager.eventTime);
+    }
+
+    public void RemoveRS()
+    {
+        // Consider animation?
+        myResearchStation.GetComponent<SpriteRenderer>().sprite = null;
+    }
+
+    public string GetColor()
+    {
+        return transform.parent.transform.name.Substring(4);
+    }
+
+    public static void Won()
+    {
+        foreach (CityController city in cities)
         {
-            this.hasResearchStation = false;
-            GameObject.Destroy(this.myResearchStation);
-            this.myResearchStation = null;
+            GameObject won = GameObject.Instantiate(Resources.Load<GameObject>("Prefabs/Winner"));
+            won.GetComponent<EnlargeVanishAnimationScript>().BeginAnimation(city.transform.gameObject, 4 * GameManager.eventTime,0.5f);
         }
     }
 
-    public void UpdateQuarantine(bool quarantined)
+    public static void Lost()
     {
-        if (quarantined)
+        foreach (CityController city in cities)
         {
-            this.AddQuarantine();
-        }
-        else
-        {
-            this.RemoveQuarantine();
-        }
-    }
-
-    private void AddQuarantine()
-    {
-        if (!this.hasQuarantine)
-        {
-            this.hasQuarantine = true;
-            this.myQuarantine = GameObject.Instantiate(Resources.Load<GameObject>("QuarantineArea"));
-            this.myQuarantine.transform.SetParent(this.transform);
-            this.myQuarantine.name = "QA_" + this.name;
-            this.myQuarantine.transform.position = this.transform.position + quarantineOffset;
-        }
-    }
-
-    private void RemoveQuarantine()
-    {
-        if (this.hasQuarantine)
-        {
-            this.hasQuarantine = false;
-            GameObject.Destroy(this.myQuarantine);
-            this.myQuarantine = null;
+            GameObject lost = GameObject.Instantiate(Resources.Load<GameObject>("Prefabs/Loser"));
+            lost.GetComponent<EnlargeVanishAnimationScript>().BeginAnimation(city.transform.gameObject, 4 * GameManager.eventTime,0.5f);
         }
     }
 

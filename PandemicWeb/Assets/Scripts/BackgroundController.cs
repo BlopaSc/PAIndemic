@@ -1,59 +1,36 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 
 public class BackgroundController : MonoBehaviour
 {
-    private bool showInformation;
-
+    private GameObject gameLog;
+    private GameObject skipMenu;
+    private bool previous_visibility;
     // Start is called before the first frame update
     void Start()
     {
-        ModifyVisibility(true);
-        showInformation = false;
+        gameLog = GameObject.Find("GameLog");
+        skipMenu = GameObject.Find("SkipMenuToggle");
+        SetVisibility(false);
     }
 
     // Update is called once per frame
     void Update()
     {
-        if(Input.GetKey(KeyCode.Escape))
+        bool visibility = (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl));
+        if (visibility != previous_visibility)
         {
-            ModifyVisibility(true);
-            showInformation = false;
-        }
-        if (Input.GetKey(KeyCode.Return))
-        {
-            ModifyVisibility(false);
-        }
-        if(Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
-        {
-            if (!showInformation)
-            {
-                ModifyVisibility(true);
-            }
-            
-        }
-        else
-        {
-            if (showInformation)
-            {
-                ModifyVisibility(false);
-            }
+            SetVisibility(visibility);
         }
     }
 
-    void ModifyVisibility(bool visibility)
+    void SetVisibility(bool visibility)
     {
-        showInformation = visibility;
+        previous_visibility = visibility;
         GetComponent<Image>().enabled = visibility;
-        GameObject.Find("InfectionDeckDiscard").GetComponent<Text>().enabled = visibility;
-        GameObject.Find("InfectionDeckPiles").GetComponent<Text>().enabled = visibility;
-        GameObject.Find("PlayerDeckDiscard").GetComponent<Text>().enabled = visibility;
-        GameObject.Find("GameControls").GetComponent<Text>().enabled = visibility;
-        GameObject.Find("ToggleSkipAction").transform.localScale = visibility ? new Vector3(1, 1, 1) : new Vector3(0, 0, 0);
-        GameObject.Find("GameLog").transform.localScale = visibility? new Vector3(1, 1, 1):new Vector3(0, 0, 0);
-        GameManager.LoseFocus();
+        GameObject.Find("InfectionDiscardText").GetComponent<Text>().enabled = visibility;
+        GameObject.Find("PlayerDiscardText").GetComponent<Text>().enabled = visibility;
+        gameLog.SetActive(visibility);
+        skipMenu.SetActive(visibility);
     }
-
 }

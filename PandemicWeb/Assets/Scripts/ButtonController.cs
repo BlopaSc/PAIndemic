@@ -1,24 +1,37 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class ButtonController : MonoBehaviour
 {
-
     [SerializeField]
-    private Text myText = null;
-    private string actionURL = "";
+    private Text myText;
+    private string myURL;
+    private bool endgame = false,accepted;
 
-    public void SetText(string buttonText, string buttonActionURL)
+    public void SetText(string action, string actionURL)
     {
-        myText.text = buttonText;
-        actionURL = buttonActionURL;
+        myText.text = action;
+        myURL = actionURL;
+    }
+
+    public void SetEndgame(bool acceptValue)
+    {
+        myText.text = acceptValue?"Yes":"Skip survey";
+        accepted = acceptValue;
+        endgame = true;
     }
 
     public void OnClick()
     {
-        GameManager.LoseFocus();
-        GameObject.Find("GameManager").GetComponent<GameManager>().DoAction(actionURL);
+        if (endgame)
+        {
+            StaticVariables.survey = accepted;
+            SceneManager.LoadScene("Scenes/SurveyScene", LoadSceneMode.Single);
+        }
+        else
+        {
+            GameObject.Find("GameManager").GetComponent<GameManager>().DoAction(myURL);
+        }
     }
 }
