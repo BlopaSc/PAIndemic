@@ -5,7 +5,7 @@
 
 from city_cards import city_cards
 from Game import Game,Player,PlayerRole,TurnPhase,GameState
-from Players import RandomPlayer,PlanningPlayer
+from Players import RandomPlayer,PlanningPlayer,PlanRecognitionPlayer
 
 import http.server as BaseHTTPServer
 import socketserver as SocketServer
@@ -39,26 +39,33 @@ if any(arg=='-s' for arg in sys.argv):
 if any(arg=='-l' for arg in sys.argv):
 	print("Logging games")
 	log_games = True
-
-# Logs
-errlog = sys.stdout if debug else open("server.log","w")
-if os.path.exists("game_results.log"):
-	gameresults = open("game_results.log","a")
-else:
-	gameresults = open("game_results.log","w")
-	#gid, pid, time_taken, participants info, won/loss, cures_found, eradicated_diseases, pcards_remaining, outbreaks, disease_cubes_remaining x4
-	gameresults.write('gid,pid,time_taken,result,game_turn,cures_discovered,eradicated_diseases,pcards_remaining,outbreaks,dcubes_red,dcubes_yellow,dcubes_blue,dcubes_black,AI,seed,roleH,roleC\n')
-	gameresults.flush()
 	
+questionnaire_file = "Questionnaire.txt"
+questionnaire = {}
+if os.path.exists(questionnaire_file):
+	with open(questionnaire_file) as file:
+		lines = [line.replace('\n','') for line in file.readlines() if len(line)>0]
+		for line in lines:
+			if not line.startswith('-') and not line.startswith('#'):
+				current_section = {'description': line, 'questions': []}
+				questionnaire[str(len(questionnaire))] = current_section
+			elif line.startswith('#'):
+				current_question = {'question': line.replace('# ',''), 'answers': []}
+				current_section['questions'].append(current_question)
+			elif line.startswith('-'):
+				current_question['answers'].append(line.replace('- ',''))
 
 # Required to keep track of games and locking
 games = {}
 participants = {}
+finished_games = []
 gamelock = threading.Lock()
 
+# Due to limitations with the number of participants less combinations will be used
 # Types of computer players
-computers = [PlanningPlayer]
-roles = [[PlayerRole.SCIENTIST,PlayerRole.MEDIC],
+computers = [PlanningPlayer,PlanRecognitionPlayer]
+roles = [
+		[PlayerRole.SCIENTIST,PlayerRole.MEDIC],
 		 [PlayerRole.SCIENTIST,PlayerRole.RESEARCHER],
 		 [PlayerRole.SCIENTIST,PlayerRole.QUARANTINE_SPECIALIST],
 		 [PlayerRole.MEDIC,PlayerRole.RESEARCHER],
@@ -88,8 +95,9 @@ def garbage_collector():
 			if t - games[g].ping >= 1800:
 				print("Removing:",g)
 				try:
-					# Closes game, removes it from games dict
+					# Closes game
 					games[g].close_game()
+					# Removes it from games dict
 					del games[g]
 				except Exception:
 					# No idea what this is 
@@ -98,16 +106,18 @@ def garbage_collector():
 
 # Child class special for the server
 class ServerGame(Game):
-	def __init__(self,gid,players,epidemic_cards=5,cities=city_cards,starting_city="atlanta",number_cubes=24):
+	def __init__(self,gid,players,epidemic_cards=4,cities=city_cards,starting_city="atlanta",number_cubes=24):
 		self.time_init = time.time()
 		self.ping = self.time_init
 		self.gid = gid
 		super().__init__(players,epidemic_cards,cities,starting_city,number_cubes,external_log=open("logs/game"+gid+".log","w") if log_games else None)
 	
-	def close_game(self):
+	def close_game(self,save=False):
 		print(time.asctime() + " Closing game: "+self.gid)
 		if log_games:
 			self.commons['logger'].close()
+			if not save:
+				os.remove("logs/game"+self.gid+".log")
 
 # Handler for the server
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -149,7 +159,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 	def perform_response(self,tvars = {}):
 		game = None
 		# Main page = consent page
-		if not self.path or self.path == "/" or self.path.startswith("/consent"):
+		if not self.path or self.path == "/" or self.path.startswith("/consent") or self.path.startswith("/?"):
 			self.send_text("html/consent.html")
 			return
 		if self.path.startswith("/tutorial"):
@@ -171,28 +181,29 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 				self.end_headers()
 				self.wfile.write("Not found".encode("utf8"))
 			return			
-		if self.path.startswith("/newgame"):
+		if self.path.startswith("/newgame") or self.path.startswith("/renewgame"):
 			self.ok("text/json")
 			gamelock.acquire()
-			pid = self.getgid()
+			pid = self.getgid() if self.path.startswith("/newgame") else self.path[10:]
+			gorder = participants[pid][0]+1 if pid in participants else 0
 			ai = random.choice(computers)
 			role = random.choice(roles)
 			seed = random.choice(seeds)
 			random.shuffle(role)
-			# TODO: In participants save information regarding randomness selection and player roles
-			participants[pid] = [ai.__name__,str(seed),role[0].name,role[1].name]
+			participants[pid] = [gorder,ai.__name__,str(seed),role[0].name,role[1].name]
 			gid = self.getgid()
 			game = ServerGame(gid,[Player(),ai()])
 			games[gid] = game
 			gamelock.release()
-			game.setup()
+			game.setup(seed=seed,players_roles=role)
 			game.game_advance()
 			game_state = game()
 			game_state.update({"gid": gid, "pid": pid})
+			game_state["game_log"] = game_state["game_log"][game_state["game_log"].index("Setting game up"):]
 			game_state = json.dumps(game_state,indent="\t").split('\n')	
 			for line in game_state:
 				self.writestring(line)
-			return
+			return	
 		if self.path.startswith("/game"):
 			gid = self.path[5:self.path.find('?')]
 			gamelock.acquire()
@@ -204,6 +215,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 				self.send_response(400)
 				self.send_header("Content-type", "text/html")
 				self.end_headers()
+				self.writestring("Error")
 				return
 			gamelock.release()
 			game.ping = time.time()
@@ -244,7 +256,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 					game.do_discard(discard)
 				game.game_advance()
 			self.ok("text/json")
-			game_state = json.dumps(game(),indent="\t").split('\n')
+			game_state = json.dumps(game(),indent='\t').split('\n')
 			for line in game_state:
 				self.writestring(line)
 			if game.game_state==GameState.LOST or game.game_state==GameState.WON:
@@ -264,7 +276,43 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 					])+"\n"
 				)
 				gameresults.flush()
-				# TODO: record player answers to survey
+				game.close_game(save=True)
+				gamelock.acquire()
+				del games[gid]
+				finished_games.append(gid)
+				gamelock.release()
+			return
+		if self.path.startswith("/reqsurvey"):
+			self.ok("text/json")
+			for line in json.dumps(questionnaire,indent='\t').split('\n'):
+				self.writestring(line)
+			return
+		if self.path.startswith("/survey"):
+			gid = self.path[7:self.path.find('?')]
+			gamelock.acquire()
+			valid = gid in finished_games
+			if valid:
+				finished_games.remove(gid)
+			else:
+				print("Finished game not found, gid: "+gid)
+				gamelock.release()
+				self.send_response(400)
+				self.send_header("Content-type", "text/html")
+				self.end_headers()
+				self.writestring("Error")
+				return
+			gamelock.release()
+			path = self.path[self.path.find('?')+1:]
+			get_dictionary = {get[:get.find("=")]: get[get.find("=")+1:] for get in path.split("&")}
+			pid = get_dictionary['pid']
+			del get_dictionary['pid']
+			answers = ['-1' for q in range(sum(len(questionnaire[section]['questions']) for section in questionnaire))]
+			for key in get_dictionary:
+				answers[int(key[1:])] = get_dictionary[key]
+			gamesurvey.write(','.join([gid,pid] + answers) + '\n')
+			gamesurvey.flush()
+			self.ok()
+			self.writestring("Thanks!")
 			return
 		self.send_response(400)
 		self.send_header("Content-type", "text/html")
@@ -286,6 +334,25 @@ if __name__ == '__main__':
 	# Creates logs folder
 	if not os.path.exists("logs/"):
 		os.makedirs("logs")
+	if not os.path.exists("results/"):
+		os.makedirs("results")
+	# Logs
+	elog_name = "results/server.log"
+	rlog_name = "results/game_results.log"
+	slog_name = "results/game_survey.log"
+	errlog = sys.stdout if debug else open(elog_name,"w")
+	if os.path.exists(rlog_name):
+		gameresults = open(rlog_name,"a")
+	else:
+		gameresults = open(rlog_name,"w")
+		gameresults.write('gid,pid,time_taken,result,game_turn,cures_discovered,eradicated_diseases,pcards_remaining,outbreaks,dcubes_red,dcubes_yellow,dcubes_blue,dcubes_black,gorder,AI,seed,roleH,roleC\n')
+		gameresults.flush()
+	if os.path.exists(slog_name):
+		gamesurvey = open(slog_name,"a")
+	else:
+		gamesurvey = open(slog_name,"w")
+		gamesurvey.write(','.join(['gid','pid']+[question['question'] for section in questionnaire for question in questionnaire[section]['questions']]) +'\n')
+		gamesurvey.flush()
 	# Creates server, requires ((HOST, PORT), MyTCPHandler)
 	server = ThreadingHTTPServer((HOST_NAME, PORT_NUMBER), MyHandler)
 	errlog.write(time.asctime() + " Server Starts - %s:%s\n" % (HOST_NAME, PORT_NUMBER))

@@ -4,6 +4,7 @@
 """
 
 import copy
+import functools
 import itertools
 import numpy as np
 import random
@@ -11,6 +12,10 @@ import sys
 import traceback
 from enum import IntEnum, auto
 from city_cards import city_cards
+
+
+def empty_function(self,*args):
+	return
 
 class CardType(IntEnum):
 	MISSING = auto()
@@ -44,7 +49,7 @@ class TurnPhase(IntEnum):
 
 
 class Game:
-	
+	### String representation of the game, prints basic state information
 	def __repr__(self):
 		s = "Turn: "+str(self.current_turn)+", Current player: "+str(self.players[self.current_player].playerrole.name)+", Out.Counter: "+str(self.outbreak_counter)+", Inf.Counter: "+str(self.infection_counter)+", Inf.Rate: "+str(self.infection_rate)+"\n"
 		s+= "Cures found: "+str([color+"="+str((2 if self.eradicated[color] else 1) if self.cures[color] else 0) for color in self.commons['colors']])+"\n"
@@ -57,7 +62,7 @@ class Game:
 		s+="Player deck: "+str(self.player_deck)+"\n"
 		s+="Infection deck: "+str(self.infection_deck)
 		return s
-	
+	### Returns dictionary of current game state, clears current game_log as to only have changes
 	def __call__(self):
 		game = {
 			'game_state': self.game_state.name,
@@ -81,7 +86,7 @@ class Game:
 		}
 		self.commons['game_log'] = ""
 		return game
-	
+	### Constructor function, players is a list of Player-objects, the number of players is defined by the number of objects in the list
 	def __init__(self,players,epidemic_cards=4,cities=city_cards,starting_city="atlanta",number_cubes=24,log_game=True,external_log=None):
 		assert(starting_city in cities)
 		# Save game parameters
@@ -90,9 +95,15 @@ class Game:
 		self.commons['starting_city'] = starting_city
 		self.commons['number_cubes'] = number_cubes
 		self.commons['colors'] = []
+		# Logger/external log: if not None then saves text record of game
 		self.commons['logger'] = external_log
+		# Log game: if True will save the text record of the game in commons[game_log]
 		self.commons['log_game'] = log_game
 		self.commons['game_log'] = ""
+		# Record: for each game turn saves a list of tuples-actions: (game_state, current_player, action_name, parameters)
+		self.commons['record'] = {}
+		# Flag to record previous player actions and states
+		self.record_actions = True
 		# Gather city colors and disease cubes
 		for city in city_cards:
 			if city_cards[city]['color'] not in self.commons['colors']:
@@ -118,7 +129,11 @@ class Game:
 		self.current_turn = -1
 		self.turn_phase = TurnPhase.INACTIVE
 		self.game_state = GameState.NOT_PLAYING
-	
+		self.id = None
+	### Compares the id of two Game-objects
+	def __eq__(self,other):
+		return self.id == other.id
+	### Returns a tuple-id of the game, might be different from game-id and changes after each action/phase
 	def get_id(self):
 		# Everything not included can be derived from other data
 		return (
@@ -131,16 +146,66 @@ class Game:
 				tuple(self.eradicated.values()),
 				tuple(self.remaining_disease_cubes.values()),
 				tuple(p.get_id() for p in self.players),
-				tuple(c.get_id() for c in self.cities.values())
+				tuple(c.get_id() for c in self.cities.values()),
+				self.actions
 		  )
-	
+	### Returns an independent copy of the current game, might randomize the decks to equally valid possible states	
+	def copy(self,randomize=True,skipDraws=False):
+		game = copy.copy(self)
+		game.log = functools.partial(empty_function,game)
+		game.record_actions = False
+		game.prng = random.Random()
+		game.prng.setstate(self.prng.getstate())
+		if randomize:
+			game.player_deck = copy.copy(self.player_deck)
+			game.infection_deck = copy.copy(self.infection_deck)
+			game.player_deck.deck = self.player_deck.get_possible_deck(game.prng)
+			game.infection_deck.deck = self.infection_deck.get_possible_deck(game.prng)
+		# Advance to a decision making point
+		if skipDraws:
+			if game.turn_phase == TurnPhase.DRAW or game.turn_phase == TurnPhase.INFECT:
+				game.turn_phase = TurnPhase.NEW
+		game.game_advance()
+		game.id = hash(game.get_id())
+		return game
+	### Returns a list of all possible valid next states of the game (requires the current state turn phase to be ACTIONS or DISCARD)
+	def get_neighbors(self,skipDraws=False):
+		result = []
+		player = self.players[self.current_player]
+		options = player.available_actions(self) if self.turn_phase == TurnPhase.ACTIONS or self.turn_phase == TurnPhase.DISCARD else []
+		cost = 1 if self.turn_phase == TurnPhase.ACTIONS else (2 if self.turn_phase == TurnPhase.DISCARD else 0)
+		for action in options:
+			for parameters in options[action]:
+				new_game = copy.copy(self)
+				if self.turn_phase == TurnPhase.ACTIONS:
+					new_game.do_action(action,parameters)
+				elif self.turn_phase == TurnPhase.DISCARD:
+					new_game.do_discard(**parameters)
+				if new_game.turn_phase == TurnPhase.DRAW:
+					if skipDraws:
+						new_game.turn_phase = TurnPhase.INFECT
+					else:
+						new_game.draw_phase()
+				if new_game.turn_phase == TurnPhase.INFECT:
+					if skipDraws:
+						new_game.current_player = (new_game.current_player+1)%len(new_game.players)
+						new_game.current_turn += 1
+						new_game.turn_phase = TurnPhase.NEW
+					else:
+						new_game.end_turn()
+				if new_game.turn_phase == TurnPhase.NEW:
+					new_game.start_turn()
+				new_game.id = hash(new_game.get_id())
+				result.append(((action,parameters),new_game,cost))
+		return result
+	### Log function: writes to game_log if it was requested and to logger if a stream was provided
 	def log(self,new_log):
 		if self.commons['log_game']:
 			self.commons['game_log'] += new_log+"\n"
 		if self.commons['logger'] is not None:
 			self.commons['logger'].write(new_log+"\n")
 			self.commons['logger'].flush()
-	
+	### Loads from a log file (automatically written using the log function), the Constructor settings must be the same for both games
 	def load_from_log(self,filename):
 		with open(filename,'r') as file:
 			players_roles,seed = None,None
@@ -191,8 +256,10 @@ class Game:
 					self.do_action(Player.discover_cure.__name__,{'color':line[line.find(':')+2:], 'chosen_cards':cards})
 				# TODO: Implement other possible actions: rally, special charter flight
 				self.game_advance()
-	
+	### Setup function: Allows specifying the player roles (as a list) and the randomness seed for the game
+		### MUST be called before starting a game
 	def setup(self,players_roles=None,seed=None):
+		self.commons['game_log'] = ""
 		if players_roles is not None:
 			txt="Roles="
 			for role in players_roles:
@@ -256,7 +323,6 @@ class Game:
 				self.log(player.playerrole.name+" drew: "+card.name)
 				player.cards.append(card)
 				player.colors[card.color]+=1
-		self.player_deck.missing = False
 		# Define starting player
 		maximum_population = 0
 		starting_player = 0
@@ -299,13 +365,15 @@ class Game:
 		# Start game
 		self.rstate=self.prng.getstate()
 		self.commons['error_flag'] = False
-		self.commons['game_log'] = ""
 		self.current_player = starting_player
 		self.real_current_player = None
 		self.current_turn = 1
 		self.turn_phase = TurnPhase.NEW
 		self.game_state = GameState.PLAYING
-		
+		self.commons['record'] = {}
+		# Final step
+		self.id = hash(self.get_id())
+	### Utility function, do not call (public cause Player-class needs to call it when building a new RS)
 	def calculate_distances(self):
 		city_distances = {
 				key: {target: (0 if target==key else (1 if target in self.cities[key].neighbors else len(self.cities))) for target in self.cities} for key in self.cities		
@@ -331,19 +399,20 @@ class Game:
 				unvisited.remove(current_node)
 		self.distances = city_distances
 		self.total_distances = sum(sum(d.values()) for d in self.distances.values())
-	
+	### Status check functions
 	def lost(self):
 		return self.player_deck.remaining<0 or min(self.remaining_disease_cubes.values())<0 or self.outbreak_counter>=8
-	
 	def won(self):
 		return all(self.cures.values())
-		
+	### Phase changing actions -> must be executed according to current state
 	def start_turn(self):
 		valid = self.turn_phase == TurnPhase.NEW
 		if valid:
 			self.log("Turn begin: "+self.players[self.current_player].playerrole.name)
 			self.actions = 4
 			self.turn_phase = TurnPhase.ACTIONS
+			if self.record_actions:
+				self.commons['record'][self.current_turn] = []
 		else:
 			print("Invalid turn start, current turn phase: "+self.turn_phase.name)
 		return valid
@@ -352,6 +421,8 @@ class Game:
 		valid = self.turn_phase == TurnPhase.ACTIONS and action!=self.players[self.current_player].discard.__name__
 		if valid:
 			try:
+				if self.record_actions:
+					self.commons['record'][self.current_turn].append((copy.copy(self),self.current_player,action,kwargs))
 				self.players = copy.copy(self.players)
 				self.players[self.current_player] = copy.copy(self.players[self.current_player])
 				if self.players[self.current_player].perform_action(self,action,kwargs):
@@ -360,6 +431,8 @@ class Game:
 					if self.actions == 0 and self.turn_phase == TurnPhase.ACTIONS:
 						self.turn_phase = TurnPhase.DRAW
 				else:
+					if self.record_actions:
+						self.commons['record'][self.current_turn].pop()
 					valid = False
 					print("Invalid move or something")
 					print(self.players[self.current_player])
@@ -368,8 +441,8 @@ class Game:
 					self.commons['error_flag']=True
 			except:
 				print("Error, wrong function or something.")
-				print(action)
-				print(kwargs)
+				print("Action:",action)
+				print("kwargs:",kwargs)
 				traceback.print_exc()
 				self.turn_phase = TurnPhase.INACTIVE
 				self.commons['error_flag'] = True
@@ -400,6 +473,8 @@ class Game:
 	def do_discard(self,discard):
 		valid = self.turn_phase == TurnPhase.DISCARD
 		if valid:
+			if self.record_actions:
+				self.commons['record'][self.current_turn].append((copy.copy(self),self.current_player,Player.discard.__name__,{'card':discard}))
 			self.players = copy.copy(self.players)
 			self.players[self.current_player] = copy.copy(self.players[self.current_player])
 			if self.players[self.current_player].discard(self,discard):
@@ -411,6 +486,8 @@ class Game:
 						self.real_current_player = None
 						self.turn_phase = TurnPhase.ACTIONS if self.actions > 0 else TurnPhase.DRAW
 			else:
+				if self.record_actions:
+					self.commons['record'][self.current_turn].pop()
 				print("Invalid card discard")
 		else:
 			print("Invalid do discard, current turn phase: "+self.turn_phase.name)
@@ -437,7 +514,7 @@ class Game:
 		else:
 			print("Invalid end turn, current turn phase: "+self.turn_phase.name)
 		return valid
-	
+	### Game execution functions, usually with game_loop is enough
 	def game_advance(self):
 		while self.turn_phase not in [TurnPhase.INACTIVE, TurnPhase.ACTIONS, TurnPhase.DISCARD]:
 			if self.turn_phase == TurnPhase.NEW:
@@ -600,7 +677,7 @@ class Player:
 					game.cities = copy.copy(game.cities)
 					game.cities[self.position] = copy.copy(game.cities[self.position])
 					game.cities[self.position].disinfect(game,game.cities[self.position].disease_cubes[color],color)
-					game.log("MEDIC healed "+str(color)+" at "+str(self.position))
+					game.log("MEDIC healed "+str(color)+" at: "+str(self.position))
 		elif self.playerrole == PlayerRole.QUARANTINE_SPECIALIST:
 			game.protected_cities = [self.position]
 			game.protected_cities.extend(game.cities[self.position].neighbors)
@@ -736,10 +813,11 @@ class Player:
 	def treat_disease(self,game,color):
 		valid = game.cities[self.position].disease_cubes[color] > 0
 		if valid:
-			game.log(self.playerrole.name+" treated: "+color)
+			treated = game.cities[self.position].disease_cubes[color] if (self.playerrole == PlayerRole.MEDIC or game.cures[color]) else 1
 			game.cities = copy.copy(game.cities)
 			game.cities[self.position] = copy.copy(game.cities[self.position])
-			game.cities[self.position].disinfect(game,game.cities[self.position].disease_cubes[color] if (self.playerrole == PlayerRole.MEDIC or game.cures[color]) else 1 ,color)
+			game.cities[self.position].disinfect(game,treated,color)
+			game.log(self.playerrole.name+" "+str(treated)+"-treated: "+color)
 		return valid
 	
 	def transfer_card(self,game,target,receiver,giver):
@@ -942,20 +1020,77 @@ class InfectionDeck:
 		return deck
 
 if __name__ == '__main__':
-	from Players import RandomPlayer,PlanningPlayer
-	file = open("logtest.txt","w") if True else sys.stdout
-	game = Game([RandomPlayer(),RandomPlayer()],external_log=file)
-	game.setup(players_roles=[PlayerRole.SCIENTIST,PlayerRole.RESEARCHER],seed=21)
-	for i in range(10):
+	from Players import RandomPlayer,HeuristicPlayer,PlanningPlayer,PlanRecognitionPlayer
+	game = Game([PlanningPlayer(),PlanningPlayer()],external_log = sys.stdout )
+	game.setup(players_roles=[PlayerRole.SCIENTIST,PlayerRole.RESEARCHER],seed=777)
+	for i in range(23):
 		game.game_turn()
-	game.game_advance()
-	if file != sys.stdout:
-		file.close()
-		fid = hash(game.get_id())
-		print("Game id:",fid)
-		game2 = Game([RandomPlayer(),RandomPlayer()],external_log=sys.stdout)
-		game2.load_from_log("logtest.txt")
-		sid = hash(game2.get_id())
-		print("Game id:",sid)
-		print("Equal?",fid==sid)
+		
+"""
+Expected output of test:
+	Roles=SCIENTIST,RESEARCHER
+	Seed=21
+	Setting game up
+	SCIENTIST drew: delhi
+	SCIENTIST drew: manila
+	SCIENTIST drew: taipei
+	SCIENTIST drew: tokyo
+	RESEARCHER drew: seoul
+	RESEARCHER drew: khartoum
+	RESEARCHER drew: montreal
+	RESEARCHER drew: hong_kong
+	Infect 1-blue at: paris
+	Infect 1-yellow at: santiago
+	Infect 1-blue at: new_york
+	Infect 2-black at: istanbul
+	Infect 2-black at: riyadh
+	Infect 2-red at: tokyo
+	Infect 3-black at: kolkata
+	Infect 3-blue at: washington
+	Infect 3-yellow at: sao_paulo
+	Turn begin: RESEARCHER
+	RESEARCHER gave seoul to: SCIENTIST
+	RESEARCHER drove to: washington
+	RESEARCHER direct flew to: hong_kong
+	RESEARCHER discarded: hong_kong
+	RESEARCHER direct flew to: khartoum
+	RESEARCHER discarded: khartoum
+	RESEARCHER drew: cairo
+	RESEARCHER drew: osaka
+	Infect 1-black at: cairo
+	Infect 1-blue at: essen
+	Turn begin: SCIENTIST
+	SCIENTIST direct flew to: tokyo
+	SCIENTIST discarded: tokyo
+	SCIENTIST drove to: osaka
+	SCIENTIST direct flew to: manila
+	SCIENTIST discarded: manila
+	SCIENTIST drove to: san_francisco
+	SCIENTIST drew: epidemic
+	Epidemic at: karachi
+	Infect 3-black at: karachi
+	SCIENTIST drew: lima
+	Infect 1-blue at: paris
+	Infect 1-black at: riyadh
+	Turn begin: RESEARCHER
+	RESEARCHER direct flew to: osaka
+	RESEARCHER discarded: osaka
+	RESEARCHER drove to: taipei
+	RESEARCHER drove to: osaka
+	RESEARCHER direct flew to: montreal
+	RESEARCHER discarded: montreal
+	RESEARCHER drew: baghdad
+	RESEARCHER drew: kolkata
+	Infect 0-black at: karachi
+	Outbreak at: karachi
+	Infect 1-black at: baghdad
+	Infect 0-black at: riyadh
+	Outbreak at: riyadh
+	Infect 1-black at: cairo
+	Infect 1-black at: baghdad
+	Infect 1-black at: tehran
+	Infect 1-black at: delhi
+	Infect 1-black at: mumbai
+	Infect 1-blue at: essen
+"""
 	
