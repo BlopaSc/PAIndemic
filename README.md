@@ -235,7 +235,7 @@ The system provides a wide variety of game state information through the current
 
 ## License
 
-Free to use, modify, etc. Just give me some credit.
+Included in LICENSE.txt
 
 ## Acknowledgments
 
