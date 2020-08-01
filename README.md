@@ -1,6 +1,8 @@
 # PAIndemic
 
-Is a platform developed by Pablo Sauma-Chacón of the University of Costa Rica, that allows a human player to participate in a match of the game Pandemic (cooperative board game published by Matt Leacock in 2007) with an intelligent artificial agent through a web browser. The system also allows the development and testing of new agents which will be explained ahead.
+Is a platform developed by Pablo Sauma-Chacón of the University of Costa Rica, that allows a human player to participate in a match of the game Pandemic (cooperative board game published by Matt Leacock in 2007) with an intelligent artificial agent through a web browser. The system also allows the development and testing of AI agents by themselves.
+
+If you desire to only try the agent evaluation, skip all the sections related to Unity/the web client.
 
 ## Getting Started
 
@@ -33,10 +35,16 @@ Most of the system is built using standard libraries but just in case here is a 
     * time
     * traceback
 
-### How to get this running
+### How to test an AI
 
-The Python server-game logic system is really straightforward so I won't explain how to get it running cause it already should be. But in case you are missing any of those libraries, download them and install them.
-To run the system (server-client implementation) it is required to create a build of the web-client implementation. To create this build follow this guidelines:
+To test an AI all you need to do is have their implementation inherit from the Player Class (explained below) with the two required request methods (request_action and request_discard). Our release includes a variety of agents including: RandomPlayer, HeuristicPlayer and PlanningPlayer which can be used as an example or for testing purposes.
+
+To run the tests all that is required is to load the class into the FinalTests&#46;py file, modify the variable cls to the class name and execute. This script executes a number of games (currently 1000) using the desired number of threads (currently 7) for the 4-5-6 epidemics and 2-3-4 players combinations. A seed or seeds can be specified for the randomness, each game will receive a multiple of this seed as its randomness. If more than one seed is specified the script will run the games for each of these seeds (3 seeds x 1000 games x 9 combinations = 27000 games).
+
+### How to get the client running
+
+The Python server-game logic system simply requires the user to run the Server&#46;py code using Python. If you are missing any of the mentioned libraries, download and install them.
+To run the client it is required to create a build of the web-client implementation. To create this build follow this guidelines:
 
 * Run Unity and __ADD__ the project directory (_PandemicWeb_) to your projects.
 * Choose whichever version you have available and select WebGL as target platform
@@ -45,7 +53,7 @@ To run the system (server-client implementation) it is required to create a buil
 * Create a new directory called _build_ in the same directory as your Server&#46;py and select it
 * The build should be ready after a while
 
-It's important that the generated build is stored in the /build/ folder in the same directory containing Server&#46;py file (which will be used to run the server). If you modify any of the filenames that interact with the web users then modifications of the .html files (stored in the /html/ folder) might be required to fix any broken links.
+It's important that the generated build is stored in the /build/ folder in the same directory containing Server&#46;py file (which will be used to run the server). If you modify any of the filenames that interact with the web users then modifications of the .html files (stored in the /html/ folder) might be required to fix any broken links. The client will be available at localhost, but modifications can be done to run it in a public server using the -s command.
 
 ## Running the tests
 
@@ -190,7 +198,6 @@ The system provides a wide variety of game state information through the current
     * __cures__: Dictionary that tracks which cures have been found: cures["color"] = True/False
     * __eradicated__: Dictionary that tracks which diseases have been eradicated: eradicated["color"] = True/False
     * __remaining_disease_cubes__: Dictionary that tracks how many remaining cubes there are of each color: remaining_disease_cubes["color"] = int
-	* __distances__: __TODO__
 * __Card object information__: Card objects are used in the players' hands and in the player deck, their information is stored in the following attributes:
     * __name__: String with the name of the card
     * __cardtype__: A value of the CardType enum: MISSING, CITY, EVENT and PANDEMIC (EVENT is currently not in use and MISSING is used only when the deck runs out of cards and the players lose the game)
@@ -222,13 +229,13 @@ The system provides a wide variety of game state information through the current
 
 ## Authors
 
-* Pablo Sauma-Chacón, a.k.a Blopa
-    *  Contact me at: blopa.sauma@gmail.com
+* Pablo Sauma-Chacón
+    *  Contact me at: blopa.sauma@gmail.com or pablo.saumachacon@ucr.ac.cr
 * Markus Eger, thesis advisor
 
 ## License
 
-Still need to think about this
+Free to use, modify, etc. Just give me some credit.
 
 ## Acknowledgments
 
