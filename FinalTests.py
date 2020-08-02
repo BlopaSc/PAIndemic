@@ -3,19 +3,33 @@
 @author: Blopa
 """
 
+import argparse
 import os
 from Players import RandomPlayer,HeuristicPlayer,PlanningPlayer
 from TestsConcurrent import perform_test
 
 if __name__ == '__main__':
-
-	cls = PlanningPlayer
+	parser = argparse.ArgumentParser()
+	parser.add_argument("agent", type=str, help="name of the agent to use")
+	parser.add_argument("-n", "--number", type=int, help="number of simulations to run", default=1000)
+	parser.add_argument("-t", "--threads", type=int, help="number of threads to use", default=1)
+	parser.add_argument("-s", "--seeds", type=str, help="seed values separated by commans", default="2331,31337,171717")
+	args = parser.parse_args()
 	
-	threads = 7
+	agents = {
+		'random': RandomPlayer,
+		'heuristic': HeuristicPlayer,
+		'planning': PlanningPlayer
+	}
 	
-	seeds = [31337,2331,171717]
+	cls = agents[args.agent.lower()]
+	
+	threads = args.threads
+	
+	seeds = [int(s) for s in args.seeds.split(',')]
 
-	games = 1000
+	games = args.number
+	
 	params = [0.5, 0.5, 1, 6, 0.6, 0.6, 24]
 	p2 = [cls for i in range(2)]
 	p3 = [cls for i in range(3)]

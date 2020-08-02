@@ -4,6 +4,11 @@ Is a platform developed by Pablo Sauma-Chacón of the University of Costa Rica, 
 
 If you desire to only try the agent evaluation, skip all the sections related to Unity/the web client.
 
+If you only want to perform the tests used as part of the article "PAIndemic: A Planning Agent For Pandemic" run:
+
+python FinalTests.py heuristic
+python FinalTests.py planning
+
 ## Getting Started
 
 To get started you might require the following software and tools:
