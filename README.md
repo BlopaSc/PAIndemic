@@ -9,6 +9,8 @@ If you only want to perform the tests used as part of the article "PAIndemic: A 
 python FinalTests.py heuristic
 python FinalTests.py planning
 
+Warning: Running the planning agent test consumes a lot of time (days), if multiple threads are available execution can be done faster using the command -t x were 'x' is the number of threads to use.
+
 ## Getting Started
 
 To get started you might require the following software and tools:
