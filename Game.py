@@ -1020,7 +1020,7 @@ class InfectionDeck:
 		return deck
 
 if __name__ == '__main__':
-	from Players import RandomPlayer,HeuristicPlayer,PlanningPlayer,PlanRecognitionPlayer
+	from Players import RandomPlayer,HeuristicPlayer,PlanningPlayer
 	game = Game([PlanningPlayer(),PlanningPlayer()],external_log = sys.stdout )
 	game.setup(players_roles=[PlayerRole.SCIENTIST,PlayerRole.RESEARCHER],seed=777)
 	for i in range(23):
